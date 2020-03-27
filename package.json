@@ -1,0 +1,24 @@
+{
+  "name": "dungeonsanddragonsreact",
+  "version": "1.0.0",
+  "description": "3.5e based web app",
+  "main": "source/index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Leonardo-Rocha/dungeonsAndDragonsREACT.git"
+  },
+  "author": "Leonardo-Rocha",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Leonardo-Rocha/dungeonsAndDragonsREACT/issues"
+  },
+  "homepage": "https://github.com/Leonardo-Rocha/dungeonsAndDragonsREACT#readme",
+  "dependencies": {
+    "firebase": "^7.13.0",
+    "firebase-admin": "^8.10.0",
+    "firebase-functions": "^3.5.0"
+  }
+}
