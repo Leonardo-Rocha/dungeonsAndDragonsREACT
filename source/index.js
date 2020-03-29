@@ -20,14 +20,13 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 
 let db = firebase.firestore();
-
 /*
-let docRef = db.collection('users').doc('alovelace');
+// ADD CHARACTER
+let characterRef = db.collection('characters').doc('alegod');
 
 let setAda = docRef.set({
-  first: 'Ada',
-  last: 'Lovelace',
-  born: 1815
+  name: character1.name;
+  className: character1.className;
 });
 
 let aTuringRef = db.collection('users').doc('aturing');
