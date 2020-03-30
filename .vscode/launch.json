@@ -12,7 +12,14 @@
             "skipFiles": [
                 "<node_internals>/**"
             ],
-            "program": "${workspaceFolder}\\source\\classes.js"
+            "program": "${workspaceFolder}\\source\\character.js"
+        },
+        {
+            "name": "Launch js in browser",
+            "type": "firefox",
+            "request": "launch",
+            "reAttach": true,
+            "file": "${workspaceFolder}\\public\\index.html"
         }
     ]
 }

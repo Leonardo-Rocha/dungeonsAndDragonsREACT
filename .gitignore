@@ -105,3 +105,7 @@ dist
 
 # Firebase cache files
 .firebase/*
+
+# Visual studio code IDE files
+.vs/*
+.vscode/*

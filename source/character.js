@@ -1,0 +1,277 @@
+/*
+* This document contains all character-related classes and methods. The necessary stuff to create a character sheet.
+*/
+class Character {
+    db = {};
+    skillsTable = {};
+    skills = {};
+
+    constructor(skillsTable, name, className, race) {
+        this.skillsTable = skillsTable;
+        this.name = name;
+        this.className = className;
+        this.race = race;
+        this.setClassSkills();
+    }
+    
+    /**
+     * Set the character skills consulting the table and including only the elements of the given list.
+     *
+     * @param {Array.<string>} skillsList
+     * @memberof Character
+     */
+    setCharacterSkillsByList(skillsList) {
+        Object.keys(this.skillsTable).map(k => {
+            if(skillsList.includes(k)) {
+                this.skills[k] = {...this.skillsTable[k]};
+                this.skills[k].isClassSkill = true;
+            }  
+        }) 
+    }
+
+    /**
+     * Sets a character default class skills consulting the Skills Table.
+     * This is called on the constructor.
+     * @memberof Character
+     */
+    setClassSkills() {
+        this.allKnowledges = ['knowledgeArcana', 'knowledgeArchitectureEngineering','knowledgeDungeoneering', "knowledgeGeography", 
+        'knowledgeHistory', 'knowledgeLocal', 'knowledgeNature', 'knowledgeNobilityRoyalty','knowledgeReligion', 'knowledgeThePlanes'];
+
+        switch (this.className) {
+            case "Barbarian":             
+                this.setCharacterSkillsByList(['climb', 'craft', 'handleAnimal', 'intimidate', 'jump', 'listen', 'ride', 'survival', 'swim']);
+                break;
+            case "Bard":
+                this.setCharacterSkillsByList(['appraise', 'balance', 'bluff', 'climb', 'concentration', 'craft', 'decipherScript', 'diplomacy',
+                'disguise', 'escapeArtist', 'gatherInformation', 'hide', 'jump', ...this.allKnowledges, 'listen', 'moveSilently', 'perform', 'profession',
+                'senseMotive','sleightOfHand', 'speakLanguage', 'spellcraft', 'swim', 'tumble', 'useMagicDevice']);
+            case "Cleric": //TODO: TEM QUE LEVAR EM CONTA DOMINIO, FAZER NO FRONT-END
+                this.setCharacterSkillsByList(['concentration', 'craft', 'diplomacy', 'heal', 'knowledgeArcana', 'knowledgeHistory',
+                'knowledgeReligion', 'knowledgeThePlanes', 'profession', 'spellcraft' ]);
+                break;
+            case "Druid":
+                this.setCharacterSkillsByList(['concentration','craft','diplomacy','handleAnimal','heal','knowledgeNature','listen','profession',
+                'ride','spellcraft','spot','survival','swim']);
+                break;
+            case "Fighter":
+                this.setCharacterSkillsByList(['climb','craft','handleAnimal','intimidate','jump','ride','swim']);                
+                break;
+            case "Monk":
+                this.setCharacterSkillsByList(['balance','climb','concentration','craft','diplomacy','escapeArtist','hide','jump','knowledgeArcana',
+                'knowledgeReligion','listen','moveSilently','perform','profession','senseMotive','spot','swim','tumble']);
+                break;
+            case "Paladin":
+                this.setCharacterSkillsByList(['concentration','craft','diplomacy','handleAnimal','heal','knowledgeNobilityRoyalty','knowledgeReligion',
+                'profession','ride','senseMotive']);
+                break;
+            case "Ranger":
+                this.setCharacterSkillsByList(['climb','concentration','craft','handleAnimal','heal','hide','jump','knowledgeDungeoneering',
+                'knowledgeGeography','knowledgeNature','listen','moveSilently','profession','ride','search','spot','survival','swim','useRope']);
+                break;
+            case "Rogue":
+                this.setCharacterSkillsByList(['appraise','balance','bluff','climb','craft','decipherScript','diplomacy','disableDevice','disguise',
+                'escapeArtist','forgery','gatherInformation','hide','intimidate','jump','knowledgeLocal','listen','moveSilently','openLock',
+                'perform','profession','search','senseMtive','sleightOfHand','spot','swim','tumble','useMagicDevice','useRope']);
+                break;
+            case "Sorcerer":
+                this.setCharacterSkillsByList(['bluff','concentration','craft','knowledgeArcana','profession','spellcraft']);
+                break;
+            case "Wizard":
+                this.setCharacterSkillsByList(['concentration','craft','decipherScript', ...this.allKnowledges,'profession','spellcraft']);
+                break;
+            default:
+                break;
+        }
+    }
+    
+    /**
+     * Adds a new skill consulting the skills table.
+     *
+     * @param {string} skillId
+     * @memberof Character
+     */
+    addSkill(skillId) {
+        newSkill = {...skillsTable[skillId]};
+        
+        skills[skillId] = newSkill;
+    }
+
+    /**
+     * Increment a skill rank by the given quantity, by default is one.
+     *
+     * @param {string} skillId
+     * @param {number} [rankIncrementQuantity=1]
+     * @memberof Character
+     */
+    incrementSkillRank(skillId, rankIncrementQuantity = 1) {
+        skill = this.skills[skillId];
+        skill.incrementRank(rankIncrementQuantity);
+    }
+
+    /**
+     * @returns a list of the character skills.
+     * @memberof Character
+     */
+    getCharacterSkillsFromDB() {
+        let characterSkills = {};
+
+        let skillsRef = db.collection('characters').doc(name).collection('skills');
+
+        let allSkills = skillsRef.get()
+        .then(snapshot => {
+            snapshot.forEach(doc => {
+            console.log(doc.id, '=>', doc.data());
+            characterSkills[doc.id] = doc.data();
+            return characterSkills;
+            });
+        })
+        .catch(err => {
+            console.log('Error getting skills', err);
+        });
+    }
+}
+
+
+/**
+ * This class represents a single character skill with the proper fields and methods to modify them.
+ *
+ * @class Skill
+ */
+class Skill {
+
+    total = 0;
+
+    constructor(skillName = "", keyAbility = "", skillRank = 0, isClassSkill = false, skillModifiers = {}) {
+        this.skillName = skillName;        
+        this.keyAbility = keyAbility;
+        this.skillRank = skillRank;
+        this.isClassSkill = isClassSkill;
+        this.skillModifiers = skillModifiers;
+    }
+
+    /**
+     * Increment the skill rank by given quantity and compute the new total. By default increment by one.
+     * 
+     * @param {number} [rankIncrementQuantity = 1]
+     * @memberof Skill
+     */
+    incrementRank(rankIncrementQuantity = 1) {
+        this.skillRank += rankIncrementQuantity;
+        this.total += this.computeRankTotal();
+    }
+
+    /**
+     * Compute the total adding the rank properly.
+     * By the 3.5 rules, if it's not a class skill 2 ranks are required to increment the total by one.
+     *
+     * @memberof Skill
+     */
+    computeRankTotal() {
+        if (this.isClassSkill) 
+            return this.skillRank;
+        else
+            return Math.trunc(this.skillRank/2);
+    }
+
+    /**
+     * @returns accumulated modifiers values.
+     * @memberof Skill
+     */
+    computeModifiersTotal() {
+        return Object.values(this.skillModifiers).reduce((acc, cur) => acc + cur);
+    }
+
+    /**
+     * Compute the total by adding the accumulated modifiers values to the rank total.
+     * 
+     * @memberof Skill
+     */
+    computeTotal() {
+        this.total = this.computeModifiersTotal() + this.computeRankTotal();
+    }
+
+    /**
+     * Sets the skills modifiers and compute the new total.
+     * 
+     * @param {Object.<{value: number}>} modifiers
+     * @memberof Skill
+     */
+    set modifiers(modifiers) {
+        this.skillModifiers = modifiers;
+        this.computeTotal();
+    }
+
+    /**
+     * Sets the skill rank and compute the new total.
+     * 
+     * @param {number} rank
+     * @memberof Skill
+     */
+    set rank(rank) {
+        this.skillRank = rank;
+        this.computeTotal();
+    }
+}
+
+
+let skillsTable = {};
+
+createSkillsTable();
+
+let alegod = new Character(skillsTable, "alegod", "Bard", "Human");
+
+console.log([alegod.skills]);
+
+//TODO: testes unitários das funções de skills.
+
+/**
+ * Create a table with all available skills in the game.
+ */
+function createSkillsTable() {
+    skillsTable['appraise'] = new Skill("Appraise", "Int");
+    skillsTable['balance'] = new Skill("Balance", "Dex");
+    skillsTable['bluff'] = new Skill("Bluff", "Cha");
+    skillsTable['climb'] = new Skill("Climb", "Str");
+    skillsTable['concentration'] = new Skill("Concentration", "Con");
+    skillsTable['craft'] = new Skill("Craft", "Int");
+    skillsTable['decipherScript'] = new Skill("Decipher Script", "Int");
+    skillsTable['diplomacy'] = new Skill("Diplomacy", "Cha");
+    skillsTable['disableDevice'] = new Skill("Disable Device", "Dex");
+    skillsTable['disguise'] = new Skill("Disguise", "Cha");
+    skillsTable['escapeArtist'] = new Skill("Escape Artist", "Dex");
+    skillsTable['forgery'] = new Skill("Forgery", "Int");
+    skillsTable['gatherInformation'] = new Skill("Gather Information", "Cha");
+    skillsTable['handleAnimal'] = new Skill("Handle Animal", "Cha");
+    skillsTable['heal'] = new Skill("Heal", "Wis");
+    skillsTable['hide'] = new Skill("Hide", "Dex");
+    skillsTable['intimidate'] = new Skill("Intimidate", "Cha");
+    skillsTable['jump'] = new Skill("Jump", "Str");
+    skillsTable['knowledgeArcana'] = new Skill("Knowledge (Arcana)", "Int");
+    skillsTable['knowledgeArchitectureEngineering'] = new Skill("Knowledge (Architecture and Engineering)", "Int");
+    skillsTable['knowledgeDungeoneering'] = new Skill("Knowledge (Dungeoneering)", "Int");
+    skillsTable['knowledgeGeography'] = new Skill("Knowledge (Geography)", "Int");
+    skillsTable['knowledgeHistory'] = new Skill("Knowledge (History)", "Int");
+    skillsTable['knowledgeLocal'] = new Skill("Knowledge (Local)", "Int");
+    skillsTable['knowledgeNature'] = new Skill("Knowledge (Nature)", "Int");
+    skillsTable['knowledgeNobilityRoyalty'] = new Skill("Knowledge (Nobility and Royalty)", "Int");
+    skillsTable['knowledgeReligion'] = new Skill("Knowledge (Religion)", "Dex");
+    skillsTable['knowledgeThePlanes'] = new Skill("Knowledge (The planes)", "Dex");
+    skillsTable['listen'] = new Skill("Listen", "Wis");
+    skillsTable['moveSilently'] = new Skill("Move Silently", "Dex");
+    skillsTable['openLock'] = new Skill("Open Lock", "Dex");
+    skillsTable['perform'] = new Skill("Perform", "Cha");
+    skillsTable['profession'] = new Skill("Profession", "Wis");
+    skillsTable['ride'] = new Skill("Ride", "Dex");
+    skillsTable['search'] = new Skill("Search", "Int");
+    skillsTable['senseMotive'] = new Skill("Sense Motive", "Wis");
+    skillsTable['sleightOfHand'] = new Skill("Sleight of Hand", "Dex");
+    skillsTable['speakLanguage'] = new Skill("Speak Language", "None");
+    skillsTable['spellcraft'] = new Skill("Spellcraft", "Int");
+    skillsTable['spot'] = new Skill("Spot", "Wis");
+    skillsTable['survival'] = new Skill("Survival", "Wis");
+    skillsTable['swim'] = new Skill("Swim", "Str");
+    skillsTable['tumble'] = new Skill("Tumble", "Dex");
+    skillsTable['useMagicDevice'] = new Skill("Use Magic Device", "Cha");
+    skillsTable['useRope'] = new Skill("Use Rope", "Dex");
+}
