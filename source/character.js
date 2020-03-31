@@ -5,6 +5,7 @@ class Character {
     db = {};
     skillsTable = {};
     skills = {};
+    skillsRanksCount = 0;
 
     constructor(skillsTable, name, className, race) {
         this.skillsTable = skillsTable;
@@ -92,9 +93,10 @@ class Character {
      * @memberof Character
      */
     addSkill(skillId) {
-        newSkill = {...skillsTable[skillId]};
-        
-        skills[skillId] = newSkill;
+        if(skillId in skillsTable)
+            this.skills[skillId] = {...this.skillsTable[skillId]};
+        else 
+            console.warn(`WARNING: In character '${this.name}' not able to addSkill '${skillId}' => invalid skillId`); 
     }
 
     /**
@@ -105,8 +107,41 @@ class Character {
      * @memberof Character
      */
     incrementSkillRank(skillId, rankIncrementQuantity = 1) {
-        skill = this.skills[skillId];
-        skill.incrementRank(rankIncrementQuantity);
+        if(skillId in this.skills) {
+            const skill = this.skills[skillId]; 
+            skill.incrementRank(rankIncrementQuantity);
+            this.skillsCount += rankIncrementQuantity;
+        }
+        else 
+            console.warn(`WARNING: In character '${this.name}' not able to incrementSkillRank '${skillId}' => invalid skillId`); 
+    }
+
+    /**
+     * Sets the modifiers of a given skill
+     *
+     * @param {string} skillId
+     * @param {Object.<{value: number}>}
+     * @memberof Character
+     */
+    setSkillModifiers(skillId, skillModifiers) {
+        if(skillId in skillsTable)
+            this.skills[skillId].setModifiers(skillModifiers);
+        else
+            console.warn(`WARNING: In character '${this.name}' not able to setSkillModifiers '${skillId}' => invalid skillId`); 
+    }
+
+    /**
+     * Sets the rank of a given skill
+     *
+     * @param {string} skillId
+     * @param {number} newRank
+     * @memberof Character
+     */
+    setSkillRank(skillId, newRank) {
+        if(skillId in skillsTable)
+            this.skills[skillId].setRank(Math.abs(newRank));
+        else 
+            console.warn(`WARNING: In character '${this.name}' not able to setSkillRank '${skillId}' => invalid skillId`); 
     }
 
     /**
@@ -132,7 +167,6 @@ class Character {
     }
 }
 
-
 /**
  * This class represents a single character skill with the proper fields and methods to modify them.
  *
@@ -141,25 +175,25 @@ class Character {
 class Skill {
 
     total = 0;
-
-    constructor(skillName = "", keyAbility = "", skillRank = 0, isClassSkill = false, skillModifiers = {}) {
+    //TODO: add ability modifier by default
+    constructor(skillName, keyAbility, skillRank = 0, isClassSkill = false, skillModifiers = {}) {
         this.skillName = skillName;        
         this.keyAbility = keyAbility;
-        this.skillRank = skillRank;
+        this.rank = skillRank;
         this.isClassSkill = isClassSkill;
-        this.skillModifiers = skillModifiers;
+        this.modifiers = skillModifiers;
     }
 
     /**
      * Increment the skill rank by given quantity and compute the new total. By default increment by one.
      * 
-     * @param {number} [rankIncrementQuantity = 1]
+     * @param {number} rankIncrementQuantity
      * @memberof Skill
      */
-    incrementRank(rankIncrementQuantity = 1) {
-        this.skillRank += rankIncrementQuantity;
-        this.total += this.computeRankTotal();
-    }
+    incrementRank = function(rankIncrementQuantity) {
+        this.rank += rankIncrementQuantity;
+        this.computeTotal();
+    };
 
     /**
      * Compute the total adding the rank properly.
@@ -167,29 +201,33 @@ class Skill {
      *
      * @memberof Skill
      */
-    computeRankTotal() {
+    computeRankTotal = function() {
         if (this.isClassSkill) 
-            return this.skillRank;
+            return this.rank;
         else
-            return Math.trunc(this.skillRank/2);
-    }
+            return Math.trunc(this.rank/2);
+    };
 
     /**
      * @returns accumulated modifiers values.
      * @memberof Skill
      */
-    computeModifiersTotal() {
-        return Object.values(this.skillModifiers).reduce((acc, cur) => acc + cur);
-    }
+    computeModifiersTotal = function() {
+        let values = Object.values(this.modifiers);
+        if(values.length)
+            return Object.values(this.modifiers).reduce((acc, cur) => acc + cur);
+        else
+            return 0;
+    };
 
     /**
      * Compute the total by adding the accumulated modifiers values to the rank total.
      * 
      * @memberof Skill
      */
-    computeTotal() {
+    computeTotal = function () {
         this.total = this.computeModifiersTotal() + this.computeRankTotal();
-    }
+    };
 
     /**
      * Sets the skills modifiers and compute the new total.
@@ -197,8 +235,8 @@ class Skill {
      * @param {Object.<{value: number}>} modifiers
      * @memberof Skill
      */
-    set modifiers(modifiers) {
-        this.skillModifiers = modifiers;
+    setModifiers = function(modifiers) {
+        this.modifiers = modifiers;
         this.computeTotal();
     }
 
@@ -208,8 +246,8 @@ class Skill {
      * @param {number} rank
      * @memberof Skill
      */
-    set rank(rank) {
-        this.skillRank = rank;
+    setRank = function(rank) {
+        this.rank = rank;
         this.computeTotal();
     }
 }
@@ -219,11 +257,21 @@ let skillsTable = {};
 
 createSkillsTable();
 
-let alegod = new Character(skillsTable, "alegod", "Bard", "Human");
+let alegod = new Character(skillsTable, "alegod", "Sorcerer", "Human");
 
-console.log([alegod.skills]);
+//console.log([alegod.skills]);
 
-//TODO: testes unitários das funções de skills.
+//testes unitários das funções de skills.
+alegod.addSkill('appraise');
+
+alegod.incrementSkillRank('appraise', 2);
+
+alegod.setSkillModifiers('appraise', {Int: 2});
+
+alegod.setSkillRank('appraise', 4);
+
+const alegodAppraise = alegod.skills['appraise'];
+console.log(`Total=${alegodAppraise.total}, Name=${alegodAppraise.skillName}, Rank=${alegodAppraise.rank}, Modifiers=${alegodAppraise.modifiers}`);
 
 /**
  * Create a table with all available skills in the game.
