@@ -113,7 +113,8 @@ class Character {
             this.skillsCount += rankIncrementQuantity;
         }
         else 
-            console.warn(`WARNING: In character '${this.name}' not able to incrementSkillRank '${skillId}' => invalid skillId`); 
+            console.warn(`WARNING: In character '${this.name}' not able to incrementSkillRank '${skillId}' => 
+            invalid skillId or not included in character skills`); 
     }
 
     /**
@@ -124,10 +125,11 @@ class Character {
      * @memberof Character
      */
     setSkillModifiers(skillId, skillModifiers) {
-        if(skillId in skillsTable)
+        if(skillId in this.skills)
             this.skills[skillId].setModifiers(skillModifiers);
         else
-            console.warn(`WARNING: In character '${this.name}' not able to setSkillModifiers '${skillId}' => invalid skillId`); 
+            console.warn(`WARNING: In character '${this.name}' not able to setSkillModifiers '${skillId}' => 
+            invalid skillId or not included in character skills`);  
     }
 
     /**
@@ -138,12 +140,14 @@ class Character {
      * @memberof Character
      */
     setSkillRank(skillId, newRank) {
-        if(skillId in skillsTable)
+        if(skillId in this.skills)
             this.skills[skillId].setRank(Math.abs(newRank));
         else 
-            console.warn(`WARNING: In character '${this.name}' not able to setSkillRank '${skillId}' => invalid skillId`); 
+            console.warn(`WARNING: In character '${this.name}' not able to setSkillRank '${skillId}' => 
+            invalid skillId or not included in character skills`); 
     }
 
+    //TODO: change this to async function
     /**
      * @returns a list of the character skills.
      * @memberof Character
