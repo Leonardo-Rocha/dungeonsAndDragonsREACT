@@ -6,6 +6,7 @@ class Character {
     skillsTable = {};
     skills = {};
     skillsRanksCount = 0;
+    abilities = {};
 
     constructor(skillsTable, name, className, race) {
         this.skillsTable = skillsTable;
@@ -13,6 +14,7 @@ class Character {
         this.className = className;
         this.race = race;
         this.setClassSkills();
+        this.setDefaultAbilites();
     }
     
     /**
@@ -169,10 +171,27 @@ class Character {
             console.log('Error getting skills', err);
         });
     }
+
+    /**
+     * Sets every character default abilities according to D&D 3.5
+     * STRENGTH (STR), DEXTERITY (DEX), CONSTITUTION (CON), INTELLIGENCE (INT) 
+     * WISDOM (WIS) and CHARISMA (CHA) 
+     *
+     * @memberof Character
+     */
+    setDefaultAbilites() {
+        this.abilities['str'] = new Ability('Str', this.race);
+        this.abilities['dex'] = new Ability('Dex', this.race);
+        this.abilities['con'] = new Ability('Con', this.race);
+        this.abilities['int'] = new Ability('Int', this.race);
+        this.abilities['wis'] = new Ability('Wis', this.race);
+        this.abilities['cha'] = new Ability('Cha', this.race);
+    }
 }
 
 /**
  * This class represents a single character skill with the proper fields and methods to modify them.
+ * It's stored in the caracter as an object of skills.
  *
  * @class Skill
  */
@@ -254,6 +273,81 @@ class Skill {
         this.rank = rank;
         this.computeTotal();
     }
+}
+
+/**
+ * This class represents a single character ability with the proper fields and methods to modify them.
+ * It's stored in the caracter as an object of abilities.
+ * 
+ * @class Ability
+ */
+class Ability {
+    total = 0;
+    modifier = 0;
+    racialModifier = 0;
+    temporaryModifiers = {};
+    baseValue = 0;
+
+    constructor(abilityName, characterRace) {
+        this.name = abilityName;
+        this.setRacialModifier(characterRace)
+    }
+
+    //TODO enum ou outra coisa para definir as raças - usar ideia de procura em lista e uma tabela para esse modificador racial
+    /**
+     * Sets the racial modifier according to the character race
+     *
+     * @param {string} characterRace
+     * @memberof Ability
+     */
+    setRacialModifier(characterRace) {
+        if(name == 'Str') {
+            // if meio orc 
+            //racialModifier = +2
+            //if gnomo ou tiefling 
+            //racialModifier = -2
+        }
+    }
+
+    /**
+     * @returns accumulated temporary modifiers values.
+     * @memberof Skill
+     */
+    computeTemporaryModifiers = function() {
+        let values = Object.values(this.temporaryModifiers);
+        if(values.length)
+            return Object.values(this.temporaryModifiers).reduce((acc, cur) => acc + cur);
+        else
+            return 0;
+    };
+
+    /**
+     * Computes the ability modifier using the formula: modifier = trunc((baseValue + racialModifier + temporaryModifiers - 10) / 2)
+     * The modifier is the number you apply to the dice roll when your character tries to do something related to that ability.
+     * 
+     * @memberof Ability
+     */
+    computeModifier = function() {
+        modifier = Math.trunc((baseValue + racialModifier + computeTemporaryModifiers() - 10) / 2);
+    }
+
+    /**
+     * Computes the ability total using the formula: total = racial + temporary + base
+     *
+     * @memberof Ability
+     */
+    computeTotal = function() {
+        total = racialModifier + computeTemporaryModifiers() + baseValue;
+    }
+    // TODO:
+    // 2. função que adiciona pontos e retorna o custo (usar no front-end)
+    // 3. Criar métodos para comprar pontos
+    // DENTRO DE CHARACTER
+    // 4. Lista de abilities (semelhante aos skills)
+    // 5. Criar habilidades default
+    // 6. Métodos que chamam os métodos de ability
+    // 7. Métodos pra distribuir pontos manualmente e aleatoriamente
+
 }
 
 
