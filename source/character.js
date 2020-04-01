@@ -2,19 +2,19 @@
 * This document contains all character-related classes and methods. The necessary stuff to create a character sheet.
 */
 class Character {
-    db = {};
-    skillsTable = {};
     skills = {};
     skillsRanksCount = 0;
     abilities = {};
 
-    constructor(skillsTable, name, className, race) {
-        this.skillsTable = skillsTable;
-        this.name = name;
-        this.className = className;
-        this.race = race;
-        this.setClassSkills();
-        this.setDefaultAbilites();
+    constructor(name, className, race, skillsTable, classSkillsTable, racialTraitsTable) {
+        this.name              = name;
+        this.className         = className;
+        this.race              = race;
+        this.skillsTable       = skillsTable;
+        this.classSkillsTable  = classSkillsTable;
+        this.racialTraitsTable = racialTraitsTable;
+        this._setClassSkills();
+        this._setDefaultAbilites();
     }
     
     /**
@@ -29,7 +29,7 @@ class Character {
                 this.skills[k] = {...this.skillsTable[k]};
                 this.skills[k].isClassSkill = true;
             }  
-        }) 
+        });
     }
 
     /**
@@ -37,55 +37,9 @@ class Character {
      * This is called on the constructor.
      * @memberof Character
      */
-    setClassSkills() {
-        this.allKnowledges = ['knowledgeArcana', 'knowledgeArchitectureEngineering','knowledgeDungeoneering', "knowledgeGeography", 
-        'knowledgeHistory', 'knowledgeLocal', 'knowledgeNature', 'knowledgeNobilityRoyalty','knowledgeReligion', 'knowledgeThePlanes'];
-
-        switch (this.className) {
-            case "Barbarian":             
-                this.setCharacterSkillsByList(['climb', 'craft', 'handleAnimal', 'intimidate', 'jump', 'listen', 'ride', 'survival', 'swim']);
-                break;
-            case "Bard":
-                this.setCharacterSkillsByList(['appraise', 'balance', 'bluff', 'climb', 'concentration', 'craft', 'decipherScript', 'diplomacy',
-                'disguise', 'escapeArtist', 'gatherInformation', 'hide', 'jump', ...this.allKnowledges, 'listen', 'moveSilently', 'perform', 'profession',
-                'senseMotive','sleightOfHand', 'speakLanguage', 'spellcraft', 'swim', 'tumble', 'useMagicDevice']);
-            case "Cleric": //TODO: TEM QUE LEVAR EM CONTA DOMINIO, FAZER NO FRONT-END
-                this.setCharacterSkillsByList(['concentration', 'craft', 'diplomacy', 'heal', 'knowledgeArcana', 'knowledgeHistory',
-                'knowledgeReligion', 'knowledgeThePlanes', 'profession', 'spellcraft' ]);
-                break;
-            case "Druid":
-                this.setCharacterSkillsByList(['concentration','craft','diplomacy','handleAnimal','heal','knowledgeNature','listen','profession',
-                'ride','spellcraft','spot','survival','swim']);
-                break;
-            case "Fighter":
-                this.setCharacterSkillsByList(['climb','craft','handleAnimal','intimidate','jump','ride','swim']);                
-                break;
-            case "Monk":
-                this.setCharacterSkillsByList(['balance','climb','concentration','craft','diplomacy','escapeArtist','hide','jump','knowledgeArcana',
-                'knowledgeReligion','listen','moveSilently','perform','profession','senseMotive','spot','swim','tumble']);
-                break;
-            case "Paladin":
-                this.setCharacterSkillsByList(['concentration','craft','diplomacy','handleAnimal','heal','knowledgeNobilityRoyalty','knowledgeReligion',
-                'profession','ride','senseMotive']);
-                break;
-            case "Ranger":
-                this.setCharacterSkillsByList(['climb','concentration','craft','handleAnimal','heal','hide','jump','knowledgeDungeoneering',
-                'knowledgeGeography','knowledgeNature','listen','moveSilently','profession','ride','search','spot','survival','swim','useRope']);
-                break;
-            case "Rogue":
-                this.setCharacterSkillsByList(['appraise','balance','bluff','climb','craft','decipherScript','diplomacy','disableDevice','disguise',
-                'escapeArtist','forgery','gatherInformation','hide','intimidate','jump','knowledgeLocal','listen','moveSilently','openLock',
-                'perform','profession','search','senseMtive','sleightOfHand','spot','swim','tumble','useMagicDevice','useRope']);
-                break;
-            case "Sorcerer":
-                this.setCharacterSkillsByList(['bluff','concentration','craft','knowledgeArcana','profession','spellcraft']);
-                break;
-            case "Wizard":
-                this.setCharacterSkillsByList(['concentration','craft','decipherScript', ...this.allKnowledges,'profession','spellcraft']);
-                break;
-            default:
-                break;
-        }
+    _setClassSkills() {
+        const classSkillsList = this.classSkillsTable[this.className];
+        this.setCharacterSkillsByList(classSkillsList);
     }
     
     /**
@@ -179,7 +133,7 @@ class Character {
      *
      * @memberof Character
      */
-    setDefaultAbilites() {
+    _setDefaultAbilites() {
         this.abilities['str'] = new Ability('Str', this.race);
         this.abilities['dex'] = new Ability('Dex', this.race);
         this.abilities['con'] = new Ability('Con', this.race);
@@ -200,11 +154,11 @@ class Skill {
     total = 0;
     //TODO: add ability modifier by default
     constructor(skillName, keyAbility, skillRank = 0, isClassSkill = false, skillModifiers = {}) {
-        this.skillName = skillName;        
-        this.keyAbility = keyAbility;
-        this.rank = skillRank;
+        this.skillName    = skillName;        
+        this.keyAbility   = keyAbility;
+        this.rank         = skillRank;
         this.isClassSkill = isClassSkill;
-        this.modifiers = skillModifiers;
+        this.modifiers    = skillModifiers;
     }
 
     /**
@@ -301,7 +255,7 @@ class Ability {
      * @memberof Ability
      */
     setRacialModifier(characterRace) {
-        if(name == 'Str') {
+        if(this.name == 'Str') {
             // if meio orc 
             //racialModifier = +2
             //if gnomo ou tiefling 
@@ -311,7 +265,7 @@ class Ability {
 
     /**
      * @returns accumulated temporary modifiers values.
-     * @memberof Skill
+     * @memberof Ability
      */
     computeTemporaryModifiers = function() {
         let values = Object.values(this.temporaryModifiers);
@@ -350,74 +304,143 @@ class Ability {
 
 }
 
+/**
+ * This class is used as a container to the specific traits and modifiers of a race.
+ *
+ * @class RacialTraits
+ */
+class RacialTraits {
+    constructor(abilitiesModifiers = {}, skillsModifiers = {}, featsModifiers = {}, otherModifiers = {}) {
+        this.abilitiesModifiers = abilitiesModifiers;
+        this.skillsModifiers    = skillsModifiers;
+        this.featsModifiers     = featsModifiers;
+        this.otherModifiers     = otherModifiers;
+    }
+}
 
-let skillsTable = {};
+classSkillsTable = {};
+skillsTable = {};
+racialTraitsTable = {};
 
+//TODO: send this to database?
 createSkillsTable();
+createRacialTraitsTable();
+createClassSkillsTable();
 
-let alegod = new Character(skillsTable, "alegod", "Sorcerer", "Human");
+let alegod = new Character("alegod", "sorcerer", "human", skillsTable, classSkillsTable, racialTraitsTable);
 
 //console.log([alegod.skills]);
 
 //testes unitários das funções de skills.
 alegod.addSkill('appraise');
 
-alegod.incrementSkillRank('appraise', 2);
-
 alegod.setSkillModifiers('appraise', {Int: 2});
 
 alegod.setSkillRank('appraise', 4);
 
+alegod.incrementSkillRank('appraise', -2);
+
 const alegodAppraise = alegod.skills['appraise'];
-console.log(`Total=${alegodAppraise.total}, Name=${alegodAppraise.skillName}, Rank=${alegodAppraise.rank}, Modifiers=${alegodAppraise.modifiers}`);
+console.table([alegod.skills['appraise']]);
+
+console.log(racialTraitsTable['dwarf'].featsModifiers['dwarfWarAxe']);
 
 /**
- * Create a table with all available skills in the game.
+ * Creates a table with all available skills in the game.
  */
 function createSkillsTable() {
-    skillsTable['appraise'] = new Skill("Appraise", "Int");
-    skillsTable['balance'] = new Skill("Balance", "Dex");
-    skillsTable['bluff'] = new Skill("Bluff", "Cha");
-    skillsTable['climb'] = new Skill("Climb", "Str");
-    skillsTable['concentration'] = new Skill("Concentration", "Con");
-    skillsTable['craft'] = new Skill("Craft", "Int");
-    skillsTable['decipherScript'] = new Skill("Decipher Script", "Int");
-    skillsTable['diplomacy'] = new Skill("Diplomacy", "Cha");
-    skillsTable['disableDevice'] = new Skill("Disable Device", "Dex");
-    skillsTable['disguise'] = new Skill("Disguise", "Cha");
-    skillsTable['escapeArtist'] = new Skill("Escape Artist", "Dex");
-    skillsTable['forgery'] = new Skill("Forgery", "Int");
-    skillsTable['gatherInformation'] = new Skill("Gather Information", "Cha");
-    skillsTable['handleAnimal'] = new Skill("Handle Animal", "Cha");
-    skillsTable['heal'] = new Skill("Heal", "Wis");
-    skillsTable['hide'] = new Skill("Hide", "Dex");
-    skillsTable['intimidate'] = new Skill("Intimidate", "Cha");
-    skillsTable['jump'] = new Skill("Jump", "Str");
-    skillsTable['knowledgeArcana'] = new Skill("Knowledge (Arcana)", "Int");
+    skillsTable['appraise']                         = new Skill("Appraise", "Int");
+    skillsTable['balance']                          = new Skill("Balance", "Dex");
+    skillsTable['bluff']                            = new Skill("Bluff", "Cha");
+    skillsTable['climb']                            = new Skill("Climb", "Str");
+    skillsTable['concentration']                    = new Skill("Concentration", "Con");
+    skillsTable['craft']                            = new Skill("Craft", "Int");
+    skillsTable['decipherScript']                   = new Skill("Decipher Script", "Int");
+    skillsTable['diplomacy']                        = new Skill("Diplomacy", "Cha");
+    skillsTable['disableDevice']                    = new Skill("Disable Device", "Dex");
+    skillsTable['disguise']                         = new Skill("Disguise", "Cha");
+    skillsTable['escapeArtist']                     = new Skill("Escape Artist", "Dex");
+    skillsTable['forgery']                          = new Skill("Forgery", "Int");
+    skillsTable['gatherInformation']                = new Skill("Gather Information", "Cha");
+    skillsTable['handleAnimal']                     = new Skill("Handle Animal", "Cha");
+    skillsTable['heal']                             = new Skill("Heal", "Wis");
+    skillsTable['hide']                             = new Skill("Hide", "Dex");
+    skillsTable['intimidate']                       = new Skill("Intimidate", "Cha");
+    skillsTable['jump']                             = new Skill("Jump", "Str");
+    skillsTable['knowledgeArcana']                  = new Skill("Knowledge (Arcana)", "Int");
     skillsTable['knowledgeArchitectureEngineering'] = new Skill("Knowledge (Architecture and Engineering)", "Int");
-    skillsTable['knowledgeDungeoneering'] = new Skill("Knowledge (Dungeoneering)", "Int");
-    skillsTable['knowledgeGeography'] = new Skill("Knowledge (Geography)", "Int");
-    skillsTable['knowledgeHistory'] = new Skill("Knowledge (History)", "Int");
-    skillsTable['knowledgeLocal'] = new Skill("Knowledge (Local)", "Int");
-    skillsTable['knowledgeNature'] = new Skill("Knowledge (Nature)", "Int");
-    skillsTable['knowledgeNobilityRoyalty'] = new Skill("Knowledge (Nobility and Royalty)", "Int");
-    skillsTable['knowledgeReligion'] = new Skill("Knowledge (Religion)", "Dex");
-    skillsTable['knowledgeThePlanes'] = new Skill("Knowledge (The planes)", "Dex");
-    skillsTable['listen'] = new Skill("Listen", "Wis");
-    skillsTable['moveSilently'] = new Skill("Move Silently", "Dex");
-    skillsTable['openLock'] = new Skill("Open Lock", "Dex");
-    skillsTable['perform'] = new Skill("Perform", "Cha");
-    skillsTable['profession'] = new Skill("Profession", "Wis");
-    skillsTable['ride'] = new Skill("Ride", "Dex");
-    skillsTable['search'] = new Skill("Search", "Int");
-    skillsTable['senseMotive'] = new Skill("Sense Motive", "Wis");
-    skillsTable['sleightOfHand'] = new Skill("Sleight of Hand", "Dex");
-    skillsTable['speakLanguage'] = new Skill("Speak Language", "None");
-    skillsTable['spellcraft'] = new Skill("Spellcraft", "Int");
-    skillsTable['spot'] = new Skill("Spot", "Wis");
-    skillsTable['survival'] = new Skill("Survival", "Wis");
-    skillsTable['swim'] = new Skill("Swim", "Str");
-    skillsTable['tumble'] = new Skill("Tumble", "Dex");
-    skillsTable['useMagicDevice'] = new Skill("Use Magic Device", "Cha");
-    skillsTable['useRope'] = new Skill("Use Rope", "Dex");
+    skillsTable['knowledgeDungeoneering']           = new Skill("Knowledge (Dungeoneering)", "Int");
+    skillsTable['knowledgeGeography']               = new Skill("Knowledge (Geography)", "Int");
+    skillsTable['knowledgeHistory']                 = new Skill("Knowledge (History)", "Int");
+    skillsTable['knowledgeLocal']                   = new Skill("Knowledge (Local)", "Int");
+    skillsTable['knowledgeNature']                  = new Skill("Knowledge (Nature)", "Int");
+    skillsTable['knowledgeNobilityRoyalty']         = new Skill("Knowledge (Nobility and Royalty)", "Int");
+    skillsTable['knowledgeReligion']                = new Skill("Knowledge (Religion)", "Dex");
+    skillsTable['knowledgeThePlanes']               = new Skill("Knowledge (The planes)", "Dex");
+    skillsTable['listen']                           = new Skill("Listen", "Wis");
+    skillsTable['moveSilently']                     = new Skill("Move Silently", "Dex");
+    skillsTable['openLock']                         = new Skill("Open Lock", "Dex");
+    skillsTable['perform']                          = new Skill("Perform", "Cha");
+    skillsTable['profession']                       = new Skill("Profession", "Wis");
+    skillsTable['ride']                             = new Skill("Ride", "Dex");
+    skillsTable['search']                           = new Skill("Search", "Int");
+    skillsTable['senseMotive']                      = new Skill("Sense Motive", "Wis");
+    skillsTable['sleightOfHand']                    = new Skill("Sleight of Hand", "Dex");
+    skillsTable['speakLanguage']                    = new Skill("Speak Language", "None");
+    skillsTable['spellcraft']                       = new Skill("Spellcraft", "Int");
+    skillsTable['spot']                             = new Skill("Spot", "Wis");
+    skillsTable['survival']                         = new Skill("Survival", "Wis");
+    skillsTable['swim']                             = new Skill("Swim", "Str");
+    skillsTable['tumble']                           = new Skill("Tumble", "Dex");
+    skillsTable['useMagicDevice']                   = new Skill("Use Magic Device", "Cha");
+    skillsTable['useRope']                          = new Skill("Use Rope", "Dex");
+}
+
+/**
+ * Creates a table with all available racial traits.
+ */
+function createRacialTraitsTable() {
+    racialTraitsTable['dwarf'] = new RacialTraits({con:2, car:-2}, {search:2, craft:2}, {dwarfWarAxe: "bla bla balla"}, {language: 'dwarf'});
+    // ...
+}
+
+/**
+ * Creates a table with with the default skills of every class.
+ */
+function createClassSkillsTable() {
+    const allKnowledges = ['knowledgeArcana', 'knowledgeArchitectureEngineering', 
+    'knowledgeDungeoneering', 'knowledgeGeography', 'knowledgeHistory', 'knowledgeLocal', 
+    'knowledgeNature', 'knowledgeNobilityRoyalty', 'knowledgeReligion', 'knowledgeThePlanes'];
+
+    classSkillsTable['barbarian'] = ['climb', 'craft', 'handleAnimal', 'intimidate', 'jump', 
+    'listen', 'ride', 'survival', 'swim'];
+    classSkillsTable['bard']      = ['appraise', 'balance', 'bluff', 'climb', 'concentration',
+    'craft','decipherScript', 'diplomacy', 'disguise', 'escapeArtist', 'gatherInformation', 
+    'hide', 'jump', ...allKnowledges, 'listen', 'moveSilently', 'perform', 'profession', 
+    'senseMotive','sleightOfHand', 'speakLanguage', 'spellcraft', 'swim', 'tumble', 
+    'useMagicDevice'];
+    classSkillsTable['cleric']    = ['concentration', 'craft', 'diplomacy', 'heal', 
+    'knowledgeArcana', 'knowledgeHistory', 'knowledgeReligion', 'knowledgeThePlanes', 
+    'profession', 'spellcraft'];
+    classSkillsTable['druid']     = ['concentration', 'craft', 'diplomacy', 'handleAnimal', 
+    'heal', 'knowledgeNature', 'listen', 'profession', 'ride', 'spellcraft', 'spot', 
+    'survival', 'swim'];
+    classSkillsTable['fighter']   = ['climb', 'craft', 'handleAnimal', 'intimidate', 
+    'jump', 'ride', 'swim'];
+    classSkillsTable['monk']      = ['balance', 'climb', 'concentration', 'craft', 
+    'diplomacy', 'escapeArtist', 'hide', 'jump', 'knowledgeArcana', 'knowledgeReligion', 
+    'listen', 'moveSilently', 'perform', 'profession', 'senseMotive', 'spot', 'swim', 'tumble'];
+    classSkillsTable['paladin']   = ['concentration', 'craft', 'diplomacy', 'handleAnimal', 
+    'heal', 'knowledgeNobilityRoyalty', 'knowledgeReligion', 'profession', 'ride', 'senseMotive'];
+    classSkillsTable['ranger']    = ['climb', 'concentration', 'craft', 'handleAnimal', 'heal', 
+    'hide', 'jump', 'knowledgeDungeoneering', 'knowledgeGeography', 'knowledgeNature', 'listen', 
+    'moveSilently', 'profession', 'ride', 'search', 'spot', 'survival', 'swim', 'useRope'];
+    classSkillsTable['rogue']     = ['appraise', 'balance', 'bluff', 'climb', 'craft', 'decipherScript',
+    'diplomacy', 'disableDevice', 'disguise', 'escapeArtist', 'forgery', 'gatherInformation', 'hide',
+    'intimidate', 'jump', 'knowledgeLocal', 'listen', 'moveSilently', 'openLock', 'perform','profession',
+    'search', 'senseMotive', 'sleightOfHand', 'spot', 'swim', 'tumble', 'useMagicDevice', 'useRope'];
+    classSkillsTable['sorcerer']  = ['bluff', 'concentration', 'craft', 'knowledgeArcana', 'profession',
+    'spellcraft'];
+    classSkillsTable['wizard']    = ['concentration', 'craft', 'decipherScript', ...allKnowledges,
+    'profession', 'spellcraft'];
 }
