@@ -1,10 +1,21 @@
 /*
-* This document contains all character-related classes and methods. The necessary stuff to create a character sheet.
+* This document contains all character-related classes and methods. The necessary
+* stuff to create a character sheet.
 */
 class Character {
     skills = {};
     skillsRanksCount = 0;
     abilities = {};
+    availableAbilityPoints = 32;
+    /**
+     * We append items in this list when the player increments a skill with the
+     * points given on and after lvl 4. This list is used to roll back if the 
+     * player loses level after death and rebirth.
+     *
+     * @memberof Character
+     */
+    levelUpSkills = [];
+    totalLevel = 1;
 
     constructor(name, className, race, skillsTable, classSkillsTable, racialTraitsTable) {
         this.name              = name;
@@ -24,7 +35,7 @@ class Character {
      * @memberof Character
      */
     setCharacterSkillsByList(skillsList) {
-        Object.keys(this.skillsTable).map(k => {
+        Object.keys(this.skillsTable).forEach(k => {
             if(skillsList.includes(k)) {
                 this.skills[k] = {...this.skillsTable[k]};
                 this.skills[k].isClassSkill = true;
@@ -56,7 +67,7 @@ class Character {
     }
 
     /**
-     * Increment a skill rank by the given quantity, by default is one.
+     * Increments or decrements a skill rank by the given quantity, by default is one.
      *
      * @param {string} skillId
      * @param {number} [rankIncrementQuantity=1]
@@ -141,6 +152,106 @@ class Character {
         this.abilities['wis'] = new Ability('Wis', this.race);
         this.abilities['cha'] = new Ability('Cha', this.race);
     }
+
+    /**
+     * Increments or decrements the baseValue of a given ability, by default is 1.
+     *
+     * @param {string} abilityId
+     * @param {boolean} [hasCost=1] if true point cost has a weight.
+     * @param {number} [incrementValue=1]
+     * @memberof Character
+     */
+    incrementAbilityBaseValue(abilityId, hasCost = true, incrementValue = 1) {
+        if(abilityId in this.abilities) {
+            const ability = this.abilities[abilityId]; 
+            const spentPoints = ability.incrementBaseValue(incrementValue, hasCost, this.availableAbilityPoints);
+            this.availableAbilityPoints -= spentPoints;
+            if(!hasCost) // increments the list used on the rollback if a player dies
+                this.levelUpSkills.push({abilityId: incrementValue});
+        }
+        else 
+            console.warn(`WARNING: In character '${this.name}' not able to incrementAbilityBaseValue '${skillId}' => 
+            invalid skillId`); 
+    }
+
+    /**
+     * Distribute the available ability points randomly using the available skill points.
+     * 
+     * @memberof Character
+     */
+    buyRandomAbilityPointsUsingAvailable() {
+        let i = 6;
+        let abilitiesArray = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
+        let incrementValue = 0;
+        let max = 10;
+        let key = '';
+
+        // loop through abilities array
+        while(i-- > 0) {
+            key = getRandomKeyInList(abilitiesArray);
+            incrementValue = getRandomInteger(1, max);
+
+            const abilityBaseValue = this.abilities[key].baseValue;
+            incrementValue = ((abilityBaseValue + incrementValue) > 18 ? (18 - abilityBaseValue) : incrementValue);
+            
+            this.incrementAbilityBaseValue(key, true, incrementValue);
+            
+            const index = abilitiesArray.indexOf(key);
+            abilitiesArray.splice(index, 1);
+        }
+        
+        // distribute what's missing
+        while(this.availableAbilityPoints > 0)
+            this.buyRandomAbilityPointsUsingAvailable();
+    }
+
+    /**
+     * Distributes random ability points using the 4d6 rule.
+     * For every ability rolls 4d6, discard the smallest.
+     * The new base value is the sum of the rolls.
+     * 
+     * @returns the spent points.
+     * @memberof Character
+     */
+    buyRandomAbilityPoints4d6() {
+        let newBaseValue = 0;
+        let rolls4d6 = [];
+        let ability;
+        let menor = 0;
+        let atual = 0;
+        let spentPoints = 0;
+        let i = 4;
+
+        Object.keys(this.abilities).forEach(k => {
+            ability = this.abilities[k];
+            menor = 7; // just a number higher than 6
+            i = 4;
+            while(i-- > 0) {
+                atual = getRandomInteger(1, 6);
+                if(atual < menor)
+                    menor = atual;
+                rolls4d6.push(atual);
+            }
+            // console.log()
+            newBaseValue = rolls4d6.reduce((acc, cur) => acc + cur) - menor;
+            rolls4d6 = [];
+            spentPoints += ability.setBaseValue(newBaseValue);
+        });
+
+        return spentPoints;
+    }
+    
+    /**
+     * Increments the level of the given class.
+     * 
+     * @param {string} className
+     * @memberof Character
+     */
+    levelUp(className, levelIncrement = 1) {
+        this.totalLevel += levelIncrement;
+        if(totalLevel % 4 == 0) // if it's a multiple of 4 
+            this.availableAbilityPoints += Math.ceiling(levelIncrement / 4);
+    }
 }
 
 /**
@@ -150,7 +261,6 @@ class Character {
  * @class Skill
  */
 class Skill {
-
     total = 0;
     //TODO: add ability modifier by default
     constructor(skillName, keyAbility, skillRank = 0, isClassSkill = false, skillModifiers = {}) {
@@ -213,7 +323,12 @@ class Skill {
      * @memberof Skill
      */
     setModifiers = function(modifiers) {
-        this.modifiers = modifiers;
+        Object.keys(modifiers).forEach(k => {
+            if(this.modifiers[k] != undefined) 
+                this.modifiers[k] += modifiers[k];
+            else 
+                this.modifiers[k] = modifiers[k];
+        });
         this.computeTotal();
     }
 
@@ -236,31 +351,14 @@ class Skill {
  * @class Ability
  */
 class Ability {
-    total = 0;
+    total = 8;
+    baseValue = 8;
     modifier = 0;
     racialModifier = 0;
     temporaryModifiers = {};
-    baseValue = 0;
 
-    constructor(abilityName, characterRace) {
+    constructor(abilityName) {
         this.name = abilityName;
-        this.setRacialModifier(characterRace)
-    }
-
-    //TODO enum ou outra coisa para definir as raças - usar ideia de procura em lista e uma tabela para esse modificador racial
-    /**
-     * Sets the racial modifier according to the character race
-     *
-     * @param {string} characterRace
-     * @memberof Ability
-     */
-    setRacialModifier(characterRace) {
-        if(this.name == 'Str') {
-            // if meio orc 
-            //racialModifier = +2
-            //if gnomo ou tiefling 
-            //racialModifier = -2
-        }
     }
 
     /**
@@ -276,13 +374,14 @@ class Ability {
     };
 
     /**
-     * Computes the ability modifier using the formula: modifier = trunc((baseValue + racialModifier + temporaryModifiers - 10) / 2)
-     * The modifier is the number you apply to the dice roll when your character tries to do something related to that ability.
+     * Computes the ability modifier using the formula: 
+     * modifier = trunc((baseValue + racialModifier + temporaryModifiers - 10) / 2)
      * 
      * @memberof Ability
      */
     computeModifier = function() {
-        modifier = Math.trunc((baseValue + racialModifier + computeTemporaryModifiers() - 10) / 2);
+        this.modifier = Math.floor((this.baseValue + this.racialModifier + 
+            this.computeTemporaryModifiers() - 10) / 2);
     }
 
     /**
@@ -291,17 +390,72 @@ class Ability {
      * @memberof Ability
      */
     computeTotal = function() {
-        total = racialModifier + computeTemporaryModifiers() + baseValue;
+        this.total = this.racialModifier + this.computeTemporaryModifiers() + 
+        this.baseValue;
     }
-    // TODO:
-    // 2. função que adiciona pontos e retorna o custo (usar no front-end)
-    // 3. Criar métodos para comprar pontos
-    // DENTRO DE CHARACTER
-    // 4. Lista de abilities (semelhante aos skills)
-    // 5. Criar habilidades default
-    // 6. Métodos que chamam os métodos de ability
-    // 7. Métodos pra distribuir pontos manualmente e aleatoriamente
 
+    /**
+     * Increments (or decrements) the base value of a skill if there's available
+     * ability points (or if it's possible).
+     * 
+     * @param {number} incrementValue
+     * @param {boolean} hasCost
+     * @param {number} availableAbilityPoints
+     * @return {number} spentPoints
+     * @memberof Ability
+     */
+    incrementBaseValue = function(incrementValue, hasCost, availableAbilityPoints) {
+        let spentPoints = 0;
+        let newValue = this.baseValue + incrementValue;
+        // incrementValue = 9
+        // availableAbilityPoints = 3
+        if(hasCost)
+            spentPoints = this._checkPointsBuyCost(newValue) - this._checkPointsBuyCost(this.baseValue);
+        else 
+            spentPoints = incrementValue;
+
+        if(newValue >= 8 && availableAbilityPoints >= spentPoints) {
+            this.baseValue += incrementValue;
+            this.computeModifier();
+            this.computeTotal();            
+        }
+        else
+            spentPoints = 0;
+
+        return spentPoints;
+    }
+
+    /**
+     * Sets a new base value and updates the modifier and the total.
+     *
+     * @param {number} newBaseValue
+     * @returns possible spent points.
+     */
+    setBaseValue = function(newBaseValue) {
+        this.baseValue = newBaseValue;
+        this.computeModifier();
+        this.computeTotal();  
+        return this._checkPointsBuyCost(newBaseValue);
+    }
+
+    /**
+     * Check the points buy cost to get a ability base value.
+     *
+     * @param {number} newValue
+     * @returns pointsBuyCost
+     * @memberof Ability
+     */
+    _checkPointsBuyCost(newValue) {
+        let pointsBuyCost = 0;
+        let pointsTable = { 15: 8, 16: 10, 17: 13, 18: 16 };
+
+        if (newValue <= 14)
+            pointsBuyCost = newValue - 8;
+        else if(newValue > 14 && newValue <= 18)
+            pointsBuyCost = pointsTable[newValue];
+
+        return pointsBuyCost;
+    }
 }
 
 /**
@@ -329,21 +483,80 @@ createClassSkillsTable();
 
 let alegod = new Character("alegod", "sorcerer", "human", skillsTable, classSkillsTable, racialTraitsTable);
 
-//console.log([alegod.skills]);
+const spentPoints = alegod.buyRandomAbilityPoints4d6();
+printAbilitiesPretty(alegod);
+
+console.log(`Spent Points: ${spentPoints}`);
+
+//printSkillsTest(alegod);
+//printAbilitiesTest(alegod);
+
+//console.log(racialTraitsTable['dwarf'].featsModifiers['dwarfWarAxe']);
+
+/**
+ * @param {number} min
+ * @param {number} max
+ * @returns a random number between min and max (both included):
+ */
+function getRandomInteger(min, max) {
+    return Math.floor(Math.random() * (max - min + 1) ) + min;
+}
+
+/**
+ * @param {array} list
+ * @return random key.
+ */
+function getRandomKeyInList(list = []) {
+    const max = list.length;
+    const randomIndex = getRandomInteger(0, max-1);
+    const randomKey = list[randomIndex];
+
+    return randomKey;
+}
+
+// testes unitários para funções de abilities
+function printAbilitiesTest(character) {
+    console.log("Abilities: ");
+    console.table([character.abilities]);
+    console.log(`AvailableAbilityPoints before increment: ${character.availableAbilityPoints}`);
+    character.incrementAbilityBaseValue('str', true, 10); // 8 + 10 = 18; modifier = 4; points = 16
+    character.incrementAbilityBaseValue('dex', true, 10); // 8 + 10 = 18; modifier = 4; points = 0
+    character.availableAbilityPoints = 2; // supposing char lvl 8
+    character.incrementAbilityBaseValue('str', false, 1); // 18 + 1 = 19; modifier = 4; points = 1
+    console.table(character.abilities['str']);
+    console.log(`AvailableAbilityPoints after increment: ${character.availableAbilityPoints}`);
+}
+
+function printAbilitiesPretty(character) {
+    let printTable = [];
+    Object.keys(character.abilities).forEach(k => {
+        const ability = character.abilities[k];
+        printTable = [...printTable, {name: ability.name, value: ability.baseValue, mod: ability.modifier}];
+    });
+
+    console.table(printTable);
+}
 
 //testes unitários das funções de skills.
-alegod.addSkill('appraise');
+function printSkillsTest(character) {
+    console.log("Skills: ");
+    console.table([character.skills]);
 
-alegod.setSkillModifiers('appraise', {Int: 2});
+    character.addSkill('appraise');
 
-alegod.setSkillRank('appraise', 4);
+    character.setSkillModifiers('appraise', {Int: 2});
+    character.setSkillModifiers('appraise', {Int: 4});
+    character.setSkillModifiers('appraise', {appraiseRing: 2});
 
-alegod.incrementSkillRank('appraise', -2);
+    character.setSkillRank('appraise', 4);
 
-const alegodAppraise = alegod.skills['appraise'];
-console.table([alegod.skills['appraise']]);
+    character.incrementSkillRank('appraise', -2);
 
-console.log(racialTraitsTable['dwarf'].featsModifiers['dwarfWarAxe']);
+    const characterAppraise = character.skills['appraise'];
+    console.log(`${characterAppraise.skillName} => total = ${characterAppraise.total}, rank = ${characterAppraise.rank}, 
+    isClassSkill = ${characterAppraise.isClassSkill}, modifiers:`);
+    console.table([characterAppraise.modifiers]);
+}
 
 /**
  * Creates a table with all available skills in the game.
@@ -400,8 +613,21 @@ function createSkillsTable() {
  * Creates a table with all available racial traits.
  */
 function createRacialTraitsTable() {
-    racialTraitsTable['dwarf'] = new RacialTraits({con:2, car:-2}, {search:2, craft:2}, {dwarfWarAxe: "bla bla balla"}, {language: 'dwarf'});
-    // ...
+    racialTraitsTable['dwarf'] = new RacialTraits({con:2, car:-2}, {},
+        {dwarfWarAxe: "Use dwarf war axe"}, {size: "medium", language: 'dwarf', baseLandSpeed:6, 
+        racial: ["Darkvision 18 meters","+2 search check on stone constructions" ,"+4 against " + 
+        "bull rush and trip while staying on the ground","+2 saving throws against all poisons",
+        "+2 saving throws against all spells and spell-like effects","+1 atack bonus agains orcs and goblins",
+        "+4 dodge AC against giant type monsters", "+2 appraise related to stones","+2 craft related to stone or metal"] });
+    racialTraitsTable['elves'] = new RacialTraits({dex:2, con:-2}, {listen:2, search:2, spot:2}, {longSword:"Use long sword",
+        rapier: "Use Rapier",  longBow:"Use Long Bow", shortBow: "Use Short Bow"}, {size: "medium", language: "elf",
+        baseLandSpeed: 9, racial: ["Low-light Vision", "Imune to magic sleep", "Instead of sleep for 8 hours, meditate for 4 hours"]} );
+    racialTraitsTable['gnome'] = new RacialTraits({con:2, str: -2}, {listen: 2}, {gnomeHookedHammer: "Use Gnome Hooked Hammer",},
+        {size: "small", language: "gnome", baseLandSpeed: 6, racial: ["Low-light vision", "+2 saving throws against illusions",
+        "+1 DC on illusions casted by gnome", "+1 atack bonus against goblins and kobolds", "+4 dodge AC against giant type monsters",
+        "+2 craft (Alchemy)", "spell like ability: 1/day speak with animals (duration 1 min)",
+        "if charisma is at least 10; 1/day - dancing lights, ghost sound, prestidigitation (caster 1, DC (10 + ChaMod + spell level))"]})
+    racialTraitsTable['halfling']
 }
 
 /**
