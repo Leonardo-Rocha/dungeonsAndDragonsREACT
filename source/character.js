@@ -1,5 +1,13 @@
+// Import other used classes
+const Utilities = require("./utilities");
+const CharacterDetails = require("./character_details");
+const Feat = require("./feat");
+const RacialTraits = require("./racial_traits");
+const Ability = require("./ability");
+const Skill = require('./skill');
+
 /*
-* This document contains all character-related classes and methods. The necessary
+* This class contains all character-related fields and methods. The necessary
 * stuff to create a character sheet.
 */
 class Character {
@@ -203,14 +211,15 @@ class Character {
 
         // loop through abilities array
         while(i-- > 0) {
-            key = getRandomKeyInList(abilitiesArray);
-            incrementValue = getRandomInteger(1, max);
+            key = Utilities.getRandomKeyInList(abilitiesArray);
+            incrementValue = Utilities.getRandomInteger(1, max);
 
             const abilityBaseValue = this.abilities[key].baseValue;
             incrementValue = ((abilityBaseValue + incrementValue) > 18 ? (18 - abilityBaseValue) : incrementValue);
             
             this.incrementAbilityBaseValue(key, true, incrementValue);
             
+            // remove the element
             const index = abilitiesArray.indexOf(key);
             abilitiesArray.splice(index, 1);
         }
@@ -232,23 +241,20 @@ class Character {
         let newBaseValue = 0;
         let rolls4d6 = [];
         let ability;
-        let menor = 0;
-        let atual = 0;
         let spentPoints = 0;
-        let i = 4;
-
+        const numberOfSides = 6;
+        const rollsQuantity = 4;
+        
         Object.keys(this.abilities).forEach(k => {
             ability = this.abilities[k];
-            menor = 7; // just a number higher than 6
-            i = 4;
-            while(i-- > 0) {
-                atual = getRandomInteger(1, 6);
-                if(atual < menor)
-                    menor = atual;
-                rolls4d6.push(atual);
-            }
-            newBaseValue = rolls4d6.reduce((acc, cur) => acc + cur) - menor;
-            rolls4d6 = [];
+            
+            const output = Utilities.rollDices(rollsQuantity, numberOfSides);
+            newBaseValue = output.total;
+            rolls4d6 = output.rolls;
+            rolls4d6.sort();
+
+            // remove the lowest dice
+            newBaseValue -= rolls4d6[0];
             spentPoints += ability.setBaseValue(newBaseValue);
         });
 
@@ -354,277 +360,6 @@ class Character {
     }
 }
 
-/**
- * This class represents a single character skill with the proper fields and 
- * methods to modify them. It's stored in the caracter as an object of skills.
- *
- * @class Skill
- */
-class Skill {
-    total = 0;
-
-    constructor(skillName, keyAbility, skillRank = 0, isClassSkill = false, skillModifiers = {}) {
-        this.skillName    = skillName;        
-        this.keyAbility   = keyAbility;
-        this.rank         = skillRank;
-        this.isClassSkill = isClassSkill;
-        this.modifiers    = skillModifiers;
-    }
-
-    /**
-     * Increment the skill rank by given quantity and compute the new total. By default increment by one.
-     * 
-     * @param {number} rankIncrementQuantity
-     * @memberof Skill
-     */
-    incrementRank = function(rankIncrementQuantity) {
-        this.rank += rankIncrementQuantity;
-        this.computeTotal();
-    }
-
-    /**
-     * Compute the total adding the rank properly.
-     * By the 3.5 rules, if it's not a class skill 2 ranks are required to increment the total by one.
-     *
-     * @memberof Skill
-     */
-    computeRankTotal = function() {
-        if (this.isClassSkill) 
-            return this.rank;
-        else
-            return Math.trunc(this.rank/2);
-    }
-
-    /**
-     * @returns accumulated modifiers values.
-     * @memberof Skill
-     */
-    computeModifiersTotal = function() {
-        let values = Object.values(this.modifiers);
-        if(values.length)
-            return values.reduce((acc, cur) => acc + cur);
-        else
-            return 0;
-    }
-
-    /**
-     * Compute the total by adding the accumulated modifiers values to the rank total.
-     * 
-     * @memberof Skill
-     */
-    computeTotal = function () {
-        this.total = this.computeModifiersTotal() + this.computeRankTotal();
-    }
-
-    /**
-     * Sets the skills modifiers and compute the new total. 
-     * Increments the value if the key already exists.
-     * 
-     * @param {Object.<{value: number}>} modifiers
-     * @memberof Skill
-     */
-    setModifiers = function(modifiers) {
-        Object.keys(modifiers).forEach(k => {
-            if(this.modifiers[k] != undefined) 
-                this.modifiers[k] += modifiers[k];
-            else 
-                this.modifiers[k] = modifiers[k];
-        });
-        this.computeTotal();
-    }
-
-    /**
-     * Sets the skill rank and compute the new total.
-     * 
-     * @param {number} rank
-     * @memberof Skill
-     */
-    setRank = function(rank) {
-        this.rank = rank;
-        this.computeTotal();
-    }
-}
-
-/**
- * This class represents a single character ability with the proper fields and methods to modify them.
- * It's stored in the caracter as an object of abilities.
- * 
- * @class Ability
- */
-class Ability {
-    total = 8;
-    baseValue = 8;
-    modifier = 0;
-    racialModifier = 0;
-    temporaryModifiers = {};
-
-    constructor(abilityName) {
-        this.name = abilityName;
-    }
-
-    /**
-     * @returns accumulated temporary modifiers values.
-     * @memberof Ability
-     */
-    computeTemporaryModifiers = function() {
-        let values = Object.values(this.temporaryModifiers);
-        if(values.length)
-            return values.reduce((acc, cur) => acc + cur);
-        else
-            return 0;
-    };
-
-    /**
-     * Computes the ability modifier using the formula: 
-     * modifier = trunc((total - 10) / 2)
-     * Where total = base + racial + temporary
-     * 
-     * @memberof Ability
-     */
-    computeModifier = function() {
-        this.computeTotal();
-        this.modifier = Math.floor((this.total - 10) / 2);
-    }
-
-    /**
-     * Computes the ability total using the formula: total = racial + temporary + base
-     *
-     * @memberof Ability
-     */
-    computeTotal = function() {
-        this.total = this.baseValue + this.racialModifier +
-        this.computeTemporaryModifiers();
-    }
-
-    /**
-     * Increments (or decrements) the base value of a skill if there's available
-     * ability points (or if it's possible).
-     * 
-     * @param {number} incrementValue
-     * @param {boolean} hasCost
-     * @param {number} availableAbilityPoints
-     * @return {number} spentPoints
-     * @memberof Ability
-     */
-    incrementBaseValue = function(incrementValue, hasCost, availableAbilityPoints) {
-        let spentPoints = 0;
-        let newValue = this.baseValue + incrementValue;
-        // incrementValue = 9
-        // availableAbilityPoints = 3
-        if(hasCost)
-            spentPoints = this._checkPointsBuyCost(newValue) - this._checkPointsBuyCost(this.baseValue);
-        else 
-            spentPoints = incrementValue;
-
-        if(newValue >= 8 && availableAbilityPoints >= spentPoints) {
-            this.baseValue += incrementValue;
-            this.computeModifier();        
-        }
-        else
-            spentPoints = 0;
-
-        return spentPoints;
-    }
-
-    /**
-     * Sets a new base value and updates the modifier and the total.
-     *
-     * @param {number} newBaseValue
-     * @returns possible spent points.
-     */
-    setBaseValue = function(newBaseValue) {
-        this.baseValue = newBaseValue;
-        this.computeModifier();
-        return this._checkPointsBuyCost(newBaseValue);
-    }
-
-    /**
-     * Sets a new racial modifier and updates the modifier and the total. 
-     * 
-     * @param {number} newRacialModifier
-     * @memberof Ability
-     */
-    setRacialModifier = function(newRacialModifier) {
-        this.racialModifier = newRacialModifier;
-        this.computeModifier();
-    }
-
-    /**
-     * Sets new temporary modifiers and updates the modifier and the total.
-     * 
-     * @param newTemporaryModifiers
-     * @memberof Ability
-     */
-    setTemporaryModifiers = function(newTemporaryModifiers) {
-        this.temporaryModifiers = newTemporaryModifiers;
-        this.computeModifier();
-    }
-
-    /**
-     * Check the points buy cost to get a ability base value.
-     *
-     * @param {number} newValue
-     * @returns pointsBuyCost
-     * @memberof Ability
-     */
-    _checkPointsBuyCost(newValue) {
-        let pointsBuyCost = 0;
-        let pointsTable = { 15: 8, 16: 10, 17: 13, 18: 16 };
-
-        if (newValue <= 14)
-            pointsBuyCost = newValue - 8;
-        else if(newValue > 14 && newValue <= 18)
-            pointsBuyCost = pointsTable[newValue];
-
-        return pointsBuyCost;
-    }
-}
-
-/**
- * This class is used as a container to the specific traits and modifiers of a race.
- *
- * @class RacialTraits
- */
-class RacialTraits {
-    constructor(abilitiesModifiers = {}, skillsModifiers = {}, featsModifiers = {}, otherModifiers = {}) {
-        this.abilitiesModifiers = abilitiesModifiers;
-        this.skillsModifiers    = skillsModifiers;
-        this.featsModifiers     = featsModifiers;
-        this.otherModifiers     = otherModifiers;
-    }
-}
-
-/**
- * This class represents a single character feat with the proper fields and 
- * methods to modify them. It's stored in the caracter as an object of skills.
- *
- * @class Feat
- */
-class Feat {
-    //TODO handle prerequisites
-    constructor(featName, description) {
-        this.name = featName;
-        this.description = description;
-    }
-}
-
-/**
- * This class is a character component used to hold important details
- * as the size and the baseLandSpeed.
- *
- * @class CharacterDetails
- */
-class CharacterDetails {
-
-    size = 0;
-    baseLandSpeed = 0;
-    racial = [];
-
-    constructor() {
-
-    }
-}
-
 classSkillsTable = {};
 skillsTable = {};
 racialTraitsTable = {};
@@ -643,32 +378,6 @@ console.log(`Spent Points: ${spentPoints}`);
 printSkillsPretty(alegod);
 printFeatsPretty(alegod);
 console.log(alegod.characterDetails);
-
-//printSkillsTest(alegod);
-//printAbilitiesTest(alegod);
-
-//console.log(racialTraitsTable['dwarf'].featsModifiers['dwarfWarAxe']);
-
-/**
- * @param {number} min
- * @param {number} max
- * @returns a random number between min and max (both included):
- */
-function getRandomInteger(min, max) {
-    return Math.floor(Math.random() * (max - min + 1) ) + min;
-}
-
-/**
- * @param {array} list
- * @return random key.
- */
-function getRandomKeyInList(list = []) {
-    const max = list.length;
-    const randomIndex = getRandomInteger(0, max-1);
-    const randomKey = list[randomIndex];
-
-    return randomKey;
-}
 
 // testes unitários para funções de abilities
 function printAbilitiesTest(character) {
