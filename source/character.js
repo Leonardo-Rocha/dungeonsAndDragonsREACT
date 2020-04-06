@@ -4,7 +4,10 @@
 */
 class Character {
     skills = {};
+    // TODO: handle available rank points according to class and int
     skillsRanksCount = 0;
+    feats = {};
+    characterDetails = {};
     abilities = {};
     availableAbilityPoints = 32;
     /**
@@ -24,8 +27,10 @@ class Character {
         this.skillsTable       = skillsTable;
         this.classSkillsTable  = classSkillsTable;
         this.racialTraitsTable = racialTraitsTable;
+        this.characterDetails  = new CharacterDetails();
         this._setClassSkills();
         this._setDefaultAbilites();
+        this._setRacialTraits();
     }
     
     /**
@@ -55,15 +60,21 @@ class Character {
     
     /**
      * Adds a new skill consulting the skills table.
-     *
+     * 
      * @param {string} skillId
+     * @returns true if the skill was sucessfully added, otherwise false.
      * @memberof Character
      */
     addSkill(skillId) {
-        if(skillId in skillsTable)
+        if(skillId in skillsTable) {
             this.skills[skillId] = {...this.skillsTable[skillId]};
-        else 
-            console.warn(`WARNING: In character '${this.name}' not able to addSkill '${skillId}' => invalid skillId`); 
+            return true;
+        }
+        else {
+            console.warn(`WARNING: In character '${this.name}' not able to ` +
+            `addSkill '${skillId}' => invalid skillId`); 
+            return false;
+        } 
     }
 
     /**
@@ -80,8 +91,9 @@ class Character {
             this.skillsCount += rankIncrementQuantity;
         }
         else 
-            console.warn(`WARNING: In character '${this.name}' not able to incrementSkillRank '${skillId}' => 
-            invalid skillId or not included in character skills`); 
+            console.warn(`WARNING: In character '${this.name}' not able to ` +
+            `incrementSkillRank '${skillId}' => invalid skillId or not included ` +
+            `in character skills`); 
     }
 
     /**
@@ -95,8 +107,9 @@ class Character {
         if(skillId in this.skills)
             this.skills[skillId].setModifiers(skillModifiers);
         else
-            console.warn(`WARNING: In character '${this.name}' not able to setSkillModifiers '${skillId}' => 
-            invalid skillId or not included in character skills`);  
+            console.warn(`WARNING: In character '${this.name}' not able to ` +
+            `setSkillModifiers '${skillId}' => ` +
+            `invalid skillId or not included in character skills`);  
     }
 
     /**
@@ -110,8 +123,9 @@ class Character {
         if(skillId in this.skills)
             this.skills[skillId].setRank(Math.abs(newRank));
         else 
-            console.warn(`WARNING: In character '${this.name}' not able to setSkillRank '${skillId}' => 
-            invalid skillId or not included in character skills`); 
+            console.warn(`WARNING: In character '${this.name}' not able to ` +
+            `setSkillRank '${skillId}' => ` +
+            `invalid skillId or not included in character skills`); 
     }
 
     //TODO: change this to async function
@@ -164,14 +178,15 @@ class Character {
     incrementAbilityBaseValue(abilityId, hasCost = true, incrementValue = 1) {
         if(abilityId in this.abilities) {
             const ability = this.abilities[abilityId]; 
-            const spentPoints = ability.incrementBaseValue(incrementValue, hasCost, this.availableAbilityPoints);
+            const spentPoints = ability.incrementBaseValue(incrementValue, hasCost, 
+                this.availableAbilityPoints);
             this.availableAbilityPoints -= spentPoints;
             if(!hasCost) // increments the list used on the rollback if a player dies
                 this.levelUpSkills.push({abilityId: incrementValue});
         }
         else 
-            console.warn(`WARNING: In character '${this.name}' not able to incrementAbilityBaseValue '${skillId}' => 
-            invalid skillId`); 
+            console.warn(`WARNING: In character '${this.name}' not able to ` +
+            `incrementAbilityBaseValue '${skillId}' => invalid skillId`); 
     }
 
     /**
@@ -208,7 +223,7 @@ class Character {
     /**
      * Distributes random ability points using the 4d6 rule.
      * For every ability rolls 4d6, discard the smallest.
-     * The new base value is the sum of the rolls.
+     * The new base value is the sum of the remaining rolls.
      * 
      * @returns the spent points.
      * @memberof Character
@@ -232,7 +247,6 @@ class Character {
                     menor = atual;
                 rolls4d6.push(atual);
             }
-            // console.log()
             newBaseValue = rolls4d6.reduce((acc, cur) => acc + cur) - menor;
             rolls4d6 = [];
             spentPoints += ability.setBaseValue(newBaseValue);
@@ -252,17 +266,103 @@ class Character {
         if(totalLevel % 4 == 0) // if it's a multiple of 4 
             this.availableAbilityPoints += Math.ceiling(levelIncrement / 4);
     }
+
+    /**
+     * Sets the racial traits of the character.
+     * It modifies the abilities, skills, feats and other.
+     * 
+     * @memberof Character
+     */
+    _setRacialTraits() {
+        const racialTraits = this.racialTraitsTable[this.race];
+        const racialAbilities = racialTraits['abilitiesModifiers'];
+        const racialSkills = racialTraits['skillsModifiers'];
+        const racialFeats = racialTraits['featsModifiers'];
+        const racialDetails = racialTraits['otherModifiers'];
+
+        this._setRacialAbilities(racialAbilities);
+        this._setRacialSkills(racialSkills);
+        this._setRacialFeats(racialFeats);
+        this._setRacialDetails(racialDetails);
+    }
+
+    /**
+     * Sets the racial modifier of the given abilities.
+     *
+     * @param {Object.<{value: Object}>} racialAbilities
+     * @memberof Character
+     */
+    _setRacialAbilities(racialAbilities) {
+        Object.keys(racialAbilities).forEach(k => {
+            const ability = this.abilities[k];
+            if(ability) {
+                const newValue = racialAbilities[k];
+                ability.setRacialModifier(newValue);
+            }
+            else 
+                console.warn(`WARNING: In character '${this.name}' not able to ` +
+                `setRacialModifier'${k}' => invalid abilityId`);
+        });
+    }
+
+    /**
+     * Sets the racial modifier of the given skills.
+     *
+     * @param {Object.<{value: Object}>} racialSkills
+     * @memberof Character
+     */
+    _setRacialSkills(racialSkills) {
+        Object.keys(racialSkills).forEach(k => {
+            let skill = this.skills[k];
+            if(skill == undefined) {
+                const hasAdded = this.addSkill(k);
+                if(!hasAdded) {
+                    console.warn(`WARNING: In character '${this.name}' not able to ` +
+                    `setRacialSkills' ${k}' => invalid skillId`);
+                    return;
+                }
+            }
+            skill = this.skills[k];
+            const newValue = racialSkills[k];
+            skill.setModifiers({racial: newValue});
+        });
+    }
+
+     /**
+     * Populates the feats instancing a new for every entry in the
+     * given list.
+     *
+     * @param {Object.<{value: string}>} racialFeats 
+     * @memberof Character
+     */
+    _setRacialFeats(racialFeats) {
+        Object.keys(racialFeats).forEach(k => {
+            this.feats[k] = new Feat(k, racialFeats[k]);
+        });
+    }
+
+    /**
+     * Sets the racial details in characterDetails.
+     *
+     * @param {Object.<{value: any}>} racialDetails
+     * @memberof Character
+     */
+    _setRacialDetails(racialDetails) {
+        Object.keys(racialDetails).forEach(k => {
+            this.characterDetails[k] = racialDetails[k];
+        });
+    }
 }
 
 /**
- * This class represents a single character skill with the proper fields and methods to modify them.
- * It's stored in the caracter as an object of skills.
+ * This class represents a single character skill with the proper fields and 
+ * methods to modify them. It's stored in the caracter as an object of skills.
  *
  * @class Skill
  */
 class Skill {
     total = 0;
-    //TODO: add ability modifier by default
+
     constructor(skillName, keyAbility, skillRank = 0, isClassSkill = false, skillModifiers = {}) {
         this.skillName    = skillName;        
         this.keyAbility   = keyAbility;
@@ -280,7 +380,7 @@ class Skill {
     incrementRank = function(rankIncrementQuantity) {
         this.rank += rankIncrementQuantity;
         this.computeTotal();
-    };
+    }
 
     /**
      * Compute the total adding the rank properly.
@@ -293,7 +393,7 @@ class Skill {
             return this.rank;
         else
             return Math.trunc(this.rank/2);
-    };
+    }
 
     /**
      * @returns accumulated modifiers values.
@@ -302,10 +402,10 @@ class Skill {
     computeModifiersTotal = function() {
         let values = Object.values(this.modifiers);
         if(values.length)
-            return Object.values(this.modifiers).reduce((acc, cur) => acc + cur);
+            return values.reduce((acc, cur) => acc + cur);
         else
             return 0;
-    };
+    }
 
     /**
      * Compute the total by adding the accumulated modifiers values to the rank total.
@@ -314,10 +414,11 @@ class Skill {
      */
     computeTotal = function () {
         this.total = this.computeModifiersTotal() + this.computeRankTotal();
-    };
+    }
 
     /**
-     * Sets the skills modifiers and compute the new total.
+     * Sets the skills modifiers and compute the new total. 
+     * Increments the value if the key already exists.
      * 
      * @param {Object.<{value: number}>} modifiers
      * @memberof Skill
@@ -368,20 +469,21 @@ class Ability {
     computeTemporaryModifiers = function() {
         let values = Object.values(this.temporaryModifiers);
         if(values.length)
-            return Object.values(this.temporaryModifiers).reduce((acc, cur) => acc + cur);
+            return values.reduce((acc, cur) => acc + cur);
         else
             return 0;
     };
 
     /**
      * Computes the ability modifier using the formula: 
-     * modifier = trunc((baseValue + racialModifier + temporaryModifiers - 10) / 2)
+     * modifier = trunc((total - 10) / 2)
+     * Where total = base + racial + temporary
      * 
      * @memberof Ability
      */
     computeModifier = function() {
-        this.modifier = Math.floor((this.baseValue + this.racialModifier + 
-            this.computeTemporaryModifiers() - 10) / 2);
+        this.computeTotal();
+        this.modifier = Math.floor((this.total - 10) / 2);
     }
 
     /**
@@ -390,8 +492,8 @@ class Ability {
      * @memberof Ability
      */
     computeTotal = function() {
-        this.total = this.racialModifier + this.computeTemporaryModifiers() + 
-        this.baseValue;
+        this.total = this.baseValue + this.racialModifier +
+        this.computeTemporaryModifiers();
     }
 
     /**
@@ -416,8 +518,7 @@ class Ability {
 
         if(newValue >= 8 && availableAbilityPoints >= spentPoints) {
             this.baseValue += incrementValue;
-            this.computeModifier();
-            this.computeTotal();            
+            this.computeModifier();        
         }
         else
             spentPoints = 0;
@@ -434,8 +535,29 @@ class Ability {
     setBaseValue = function(newBaseValue) {
         this.baseValue = newBaseValue;
         this.computeModifier();
-        this.computeTotal();  
         return this._checkPointsBuyCost(newBaseValue);
+    }
+
+    /**
+     * Sets a new racial modifier and updates the modifier and the total. 
+     * 
+     * @param {number} newRacialModifier
+     * @memberof Ability
+     */
+    setRacialModifier = function(newRacialModifier) {
+        this.racialModifier = newRacialModifier;
+        this.computeModifier();
+    }
+
+    /**
+     * Sets new temporary modifiers and updates the modifier and the total.
+     * 
+     * @param newTemporaryModifiers
+     * @memberof Ability
+     */
+    setTemporaryModifiers = function(newTemporaryModifiers) {
+        this.temporaryModifiers = newTemporaryModifiers;
+        this.computeModifier();
     }
 
     /**
@@ -472,6 +594,37 @@ class RacialTraits {
     }
 }
 
+/**
+ * This class represents a single character feat with the proper fields and 
+ * methods to modify them. It's stored in the caracter as an object of skills.
+ *
+ * @class Feat
+ */
+class Feat {
+    //TODO handle prerequisites
+    constructor(featName, description) {
+        this.name = featName;
+        this.description = description;
+    }
+}
+
+/**
+ * This class is a character component used to hold important details
+ * as the size and the baseLandSpeed.
+ *
+ * @class CharacterDetails
+ */
+class CharacterDetails {
+
+    size = 0;
+    baseLandSpeed = 0;
+    racial = [];
+
+    constructor() {
+
+    }
+}
+
 classSkillsTable = {};
 skillsTable = {};
 racialTraitsTable = {};
@@ -481,12 +634,15 @@ createSkillsTable();
 createRacialTraitsTable();
 createClassSkillsTable();
 
-let alegod = new Character("alegod", "sorcerer", "human", skillsTable, classSkillsTable, racialTraitsTable);
+let alegod = new Character('Alegod', 'sorcerer', 'elf', skillsTable, classSkillsTable, racialTraitsTable);
 
 const spentPoints = alegod.buyRandomAbilityPoints4d6();
+console.log(`Name: ${alegod.name}, Class: ${alegod.className}, Race: ${alegod.race}`);
 printAbilitiesPretty(alegod);
-
 console.log(`Spent Points: ${spentPoints}`);
+printSkillsPretty(alegod);
+printFeatsPretty(alegod);
+console.log(alegod.characterDetails);
 
 //printSkillsTest(alegod);
 //printAbilitiesTest(alegod);
@@ -527,11 +683,36 @@ function printAbilitiesTest(character) {
     console.log(`AvailableAbilityPoints after increment: ${character.availableAbilityPoints}`);
 }
 
+function printFeatsPretty(character) {
+    let printTable = [];
+    console.log('Feats: ');
+    Object.keys(character.feats).forEach(k => {
+        const feat = character.feats[k];
+        printTable = [...printTable, {name: feat.name, description: feat.description}];
+    });
+
+    console.table(printTable);
+}
+
 function printAbilitiesPretty(character) {
     let printTable = [];
+    console.log('Abilities: ');
     Object.keys(character.abilities).forEach(k => {
         const ability = character.abilities[k];
-        printTable = [...printTable, {name: ability.name, value: ability.baseValue, mod: ability.modifier}];
+        printTable = [...printTable, {name: ability.name, mod: ability.modifier, 
+            value: ability.baseValue, racial: ability.racialModifier, total: ability.total}];
+    });
+
+    console.table(printTable);
+}
+
+function printSkillsPretty(character) {
+    let printTable = [];
+    console.log('Skills: ');
+    Object.keys(character.skills).forEach(k => {
+        const skill = character.skills[k];
+        printTable = [...printTable, {isClass: skill.isClassSkill, name: skill.skillName,
+            key: skill.keyAbility, rank: skill.rank, modifiers: skill.modifiers, total: skill.total}];
     });
 
     console.table(printTable);
@@ -613,13 +794,13 @@ function createSkillsTable() {
  * Creates a table with all available racial traits.
  */
 function createRacialTraitsTable() {
-    racialTraitsTable['dwarf'] = new RacialTraits({con:2, car:-2}, {},
+    racialTraitsTable['dwarf'] = new RacialTraits({con:2, cha:-2}, {},
         {dwarfWarAxe: "Use dwarf war axe"}, {size: "medium", language: 'dwarf', baseLandSpeed:6, 
         racial: ["Darkvision 18 meters","+2 search check on stone constructions" ,"+4 against " + 
         "bull rush and trip while staying on the ground","+2 saving throws against all poisons",
         "+2 saving throws against all spells and spell-like effects","+1 atack bonus agains orcs and goblins",
         "+4 dodge AC against giant type monsters", "+2 appraise related to stones","+2 craft related to stone or metal"] });
-    racialTraitsTable['elves'] = new RacialTraits({dex:2, con:-2}, {listen:2, search:2, spot:2}, {longSword:"Use long sword",
+    racialTraitsTable['elf'] = new RacialTraits({dex:2, con:-2}, {listen:2, search:2, spot:2}, {longSword:"Use long sword",
         rapier: "Use Rapier",  longBow:"Use Long Bow", shortBow: "Use Short Bow"}, {size: "medium", language: "elf",
         baseLandSpeed: 9, racial: ["Low-light Vision", "Imune to magic sleep", "Instead of sleep for 8 hours, meditate for 4 hours"]} );
     racialTraitsTable['gnome'] = new RacialTraits({con:2, str: -2}, {listen: 2}, {gnomeHookedHammer: "Use Gnome Hooked Hammer",},
