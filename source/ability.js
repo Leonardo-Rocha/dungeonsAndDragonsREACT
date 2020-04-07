@@ -29,7 +29,8 @@ module.exports = class Ability {
             return values.reduce((acc, cur) => acc + cur);
         else
             return 0;
-    };
+    }
+
     /**
      * Computes the ability modifier using the formula:
      * modifier = trunc((total - 10) / 2)
@@ -40,7 +41,8 @@ module.exports = class Ability {
     computeModifier = function () {
         this.computeTotal();
         this.modifier = Math.floor((this.total - 10) / 2);
-    };
+    }
+
     /**
      * Computes the ability total using the formula: total = racial + temporary + base
      *
@@ -49,7 +51,8 @@ module.exports = class Ability {
     computeTotal = function () {
         this.total = this.baseValue + this.racialModifier +
             this.computeTemporaryModifiers();
-    };
+    }
+
     /**
      * Increments (or decrements) the base value of a skill if there's available
      * ability points (or if it's possible).
@@ -63,20 +66,22 @@ module.exports = class Ability {
     incrementBaseValue = function (incrementValue, hasCost, availableAbilityPoints) {
         let spentPoints = 0;
         let newValue = this.baseValue + incrementValue;
-        // incrementValue = 9
-        // availableAbilityPoints = 3
+
         if (hasCost)
             spentPoints = this._checkPointsBuyCost(newValue) - this._checkPointsBuyCost(this.baseValue);
         else
             spentPoints = incrementValue;
+
         if (newValue >= 8 && availableAbilityPoints >= spentPoints) {
             this.baseValue += incrementValue;
             this.computeModifier();
         }
         else
             spentPoints = 0;
+
         return spentPoints;
-    };
+    }
+
     /**
      * Sets a new base value and updates the modifier and the total.
      *
@@ -87,7 +92,8 @@ module.exports = class Ability {
         this.baseValue = newBaseValue;
         this.computeModifier();
         return this._checkPointsBuyCost(newBaseValue);
-    };
+    }
+
     /**
      * Sets a new racial modifier and updates the modifier and the total.
      *
@@ -97,7 +103,8 @@ module.exports = class Ability {
     setRacialModifier = function (newRacialModifier) {
         this.racialModifier = newRacialModifier;
         this.computeModifier();
-    };
+    }
+
     /**
      * Sets new temporary modifiers and updates the modifier and the total.
      *
@@ -107,7 +114,8 @@ module.exports = class Ability {
     setTemporaryModifiers = function (newTemporaryModifiers) {
         this.temporaryModifiers = newTemporaryModifiers;
         this.computeModifier();
-    };
+    }
+    
     /**
      * Check the points buy cost to get a ability base value.
      *

@@ -12,12 +12,12 @@ const Skill = require('./skill');
 */
 class Character {
     skills = {};
-    // TODO: handle available rank points according to class and int
-    skillsRanksCount = 0;
+    availableSkillPoints = 0;
     feats = {};
     characterDetails = {};
     abilities = {};
     availableAbilityPoints = 32;
+
     /**
      * We append items in this list when the player increments a skill with the
      * points given on and after lvl 4. This list is used to roll back if the 
@@ -25,7 +25,7 @@ class Character {
      *
      * @memberof Character
      */
-    levelUpSkills = [];
+    levelUpRollBackList = {};
     totalLevel = 1;
 
     constructor(name, className, race, skillsTable, classSkillsTable, racialTraitsTable) {
@@ -57,13 +57,38 @@ class Character {
     }
 
     /**
-     * Sets a character default class skills consulting the Skills Table.
+     * Sets a character default class skills and skill points per level.
      * This is called on the constructor.
      * @memberof Character
      */
     _setClassSkills() {
-        const classSkillsList = this.classSkillsTable[this.className];
-        this.setCharacterSkillsByList(classSkillsList);
+        const classSkills = this.classSkillsTable[this.className];
+        const defaultSkills = classSkills.defaultSkills;
+        const skillPointsPerLevel = classSkills.skillPointsPerLevel;
+        this.setCharacterSkillsByList(defaultSkills);
+        // this must be in character details because there's a race(Human) special case
+        this.characterDetails['skillPointsPerLevel'] = skillPointsPerLevel;
+    }
+
+    /**
+     * Updates the avaiable skill points according to the skill points per level
+     * and the current level. This must be called after the ability points distribution,
+     * because depends on the int modifier, and at each levelUp for the same reason.
+     *  
+     * For the first level the formula is levelSkillPoints * 4 and levelSkillPoints 
+     * for the higher levels. Where levelSkillPoints = skillPointsPerLevel + intModifier
+     * 
+     * @memberof Character
+     */
+    updateAvailableSkillPoints() {
+        const intModifier = this.abilities['int'].modifier;
+        const skillPointsPerLevel = this.characterDetails['skillPointsPerLevel'];
+        const levelSkillPoints = skillPointsPerLevel + intModifier;
+
+        if(this.totalLevel == 1)
+            this.availableSkillPoints = (levelSkillPoints) * 4; 
+        else 
+            this.availableSkillPoints += levelSkillPoints;
     }
     
     /**
@@ -93,31 +118,21 @@ class Character {
      * @memberof Character
      */
     incrementSkillRank(skillId, rankIncrementQuantity = 1) {
-        if(skillId in this.skills) {
-            const skill = this.skills[skillId]; 
-            skill.incrementRank(rankIncrementQuantity);
-            this.skillsCount += rankIncrementQuantity;
+        let skill = this.skills[skillId];
+        if(skill == undefined) {
+            const hasAdded = this.addSkill(skillId);
+            if(!hasAdded) {
+                console.warn(`WARNING: In character '${this.name}' not able to ` +
+                `incrementSkillRank' ${skillId}' => invalid skillId`);
+                return;
+            }
         }
-        else 
-            console.warn(`WARNING: In character '${this.name}' not able to ` +
-            `incrementSkillRank '${skillId}' => invalid skillId or not included ` +
-            `in character skills`); 
-    }
-
-    /**
-     * Sets the modifiers of a given skill
-     *
-     * @param {string} skillId
-     * @param {Object.<{value: number}>}
-     * @memberof Character
-     */
-    setSkillModifiers(skillId, skillModifiers) {
-        if(skillId in this.skills)
-            this.skills[skillId].setModifiers(skillModifiers);
-        else
-            console.warn(`WARNING: In character '${this.name}' not able to ` +
-            `setSkillModifiers '${skillId}' => ` +
-            `invalid skillId or not included in character skills`);  
+        skill = this.skills[skillId];
+        const spentPoints = skill.incrementRank(rankIncrementQuantity, this.availableSkillPoints,
+            this.totalLevel);
+        this.availableSkillPoints -= spentPoints;
+        if(spentPoints != 0)
+            this.updateRollBackList('skills', skillId, rankIncrementQuantity);
     }
 
     /**
@@ -134,6 +149,22 @@ class Character {
             console.warn(`WARNING: In character '${this.name}' not able to ` +
             `setSkillRank '${skillId}' => ` +
             `invalid skillId or not included in character skills`); 
+    }
+
+    /**
+     * Sets the modifiers of a given skill
+     *
+     * @param {string} skillId
+     * @param {Object.<{value: number}>}
+     * @memberof Character
+     */
+    setSkillModifiers(skillId, skillModifiers) {
+        if(skillId in this.skills)
+            this.skills[skillId].setModifiers(skillModifiers);
+        else
+            console.warn(`WARNING: In character '${this.name}' not able to ` +
+            `setSkillModifiers '${skillId}' => ` +
+            `invalid skillId or not included in character skills`);  
     }
 
     //TODO: change this to async function
@@ -189,12 +220,34 @@ class Character {
             const spentPoints = ability.incrementBaseValue(incrementValue, hasCost, 
                 this.availableAbilityPoints);
             this.availableAbilityPoints -= spentPoints;
-            if(!hasCost) // increments the list used on the rollback if a player dies
-                this.levelUpSkills.push({abilityId: incrementValue});
+            if(!hasCost && spentPoints != 0) {
+                // updates the list used on the rollback if a player dies
+                this.updateRollBackList('abilities', abilityId, incrementValue);
+            }   
         }
         else 
             console.warn(`WARNING: In character '${this.name}' not able to ` +
             `incrementAbilityBaseValue '${skillId}' => invalid skillId`); 
+    }
+
+    /**
+     * Updates the roll back list for the given field with a new object {id: value}.
+     *
+     * @param {string} listName this must be 'abilities'/'feats'/'skills'
+     * @param {string} id
+     * @param {any} value
+     * @memberof Character
+     */
+    updateRollBackList(listName, id, value) {
+        let list = this.levelUpRollBackList[listName];
+        if (list == undefined) {
+            this.levelUpRollBackList[listName] = {};
+            list = this.levelUpRollBackList[listName];
+        }
+        if (list[id] == undefined)
+            list[id] = value;
+        else
+            list[id] += value;
     }
 
     /**
@@ -269,8 +322,12 @@ class Character {
      */
     levelUp(className, levelIncrement = 1) {
         this.totalLevel += levelIncrement;
+        this.updateAvailableSkillPoints();
         if(totalLevel % 4 == 0) // if it's a multiple of 4 
             this.availableAbilityPoints += Math.ceiling(levelIncrement / 4);
+
+        // clears the rollBackList
+        this.levelUpRollBackList = {};
     }
 
     /**
@@ -355,7 +412,11 @@ class Character {
      */
     _setRacialDetails(racialDetails) {
         Object.keys(racialDetails).forEach(k => {
-            this.characterDetails[k] = racialDetails[k];
+            const detail = this.characterDetails[k];
+            if(detail == undefined)
+                this.characterDetails[k] = racialDetails[k];
+            else
+                this.characterDetails[k] += racialDetails[k];
         });
     }
 }
@@ -372,12 +433,15 @@ createClassSkillsTable();
 let alegod = new Character('Alegod', 'sorcerer', 'elf', skillsTable, classSkillsTable, racialTraitsTable);
 
 const spentPoints = alegod.buyRandomAbilityPoints4d6();
+alegod.updateAvailableSkillPoints();
 console.log(`Name: ${alegod.name}, Class: ${alegod.className}, Race: ${alegod.race}`);
-printAbilitiesPretty(alegod);
-console.log(`Spent Points: ${spentPoints}`);
+
+// printAbilitiesPretty(alegod);
+// console.log(`Spent Points: ${spentPoints}`);
 printSkillsPretty(alegod);
-printFeatsPretty(alegod);
-console.log(alegod.characterDetails);
+console.log(alegod.availableSkillPoints);
+// printFeatsPretty(alegod);
+
 
 // testes unitários para funções de abilities
 function printAbilitiesTest(character) {
@@ -517,7 +581,11 @@ function createRacialTraitsTable() {
         "+1 DC on illusions casted by gnome", "+1 atack bonus against goblins and kobolds", "+4 dodge AC against giant type monsters",
         "+2 craft (Alchemy)", "spell like ability: 1/day speak with animals (duration 1 min)",
         "if charisma is at least 10; 1/day - dancing lights, ghost sound, prestidigitation (caster 1, DC (10 + ChaMod + spell level))"]})
-    racialTraitsTable['halfling']
+    racialTraitsTable['halfling'] = {
+
+        };
+    racialTraitsTable['human'] = new RacialTraits({}, {}, {}, {skillPointsPerLevel: 1});
+
 }
 
 /**
@@ -525,38 +593,42 @@ function createRacialTraitsTable() {
  */
 function createClassSkillsTable() {
     const allKnowledges = ['knowledgeArcana', 'knowledgeArchitectureEngineering', 
-    'knowledgeDungeoneering', 'knowledgeGeography', 'knowledgeHistory', 'knowledgeLocal', 
-    'knowledgeNature', 'knowledgeNobilityRoyalty', 'knowledgeReligion', 'knowledgeThePlanes'];
+        'knowledgeDungeoneering', 'knowledgeGeography', 'knowledgeHistory', 'knowledgeLocal', 
+        'knowledgeNature', 'knowledgeNobilityRoyalty', 'knowledgeReligion', 'knowledgeThePlanes'];
 
-    classSkillsTable['barbarian'] = ['climb', 'craft', 'handleAnimal', 'intimidate', 'jump', 
-    'listen', 'ride', 'survival', 'swim'];
-    classSkillsTable['bard']      = ['appraise', 'balance', 'bluff', 'climb', 'concentration',
-    'craft','decipherScript', 'diplomacy', 'disguise', 'escapeArtist', 'gatherInformation', 
-    'hide', 'jump', ...allKnowledges, 'listen', 'moveSilently', 'perform', 'profession', 
-    'senseMotive','sleightOfHand', 'speakLanguage', 'spellcraft', 'swim', 'tumble', 
-    'useMagicDevice'];
-    classSkillsTable['cleric']    = ['concentration', 'craft', 'diplomacy', 'heal', 
-    'knowledgeArcana', 'knowledgeHistory', 'knowledgeReligion', 'knowledgeThePlanes', 
-    'profession', 'spellcraft'];
-    classSkillsTable['druid']     = ['concentration', 'craft', 'diplomacy', 'handleAnimal', 
-    'heal', 'knowledgeNature', 'listen', 'profession', 'ride', 'spellcraft', 'spot', 
-    'survival', 'swim'];
-    classSkillsTable['fighter']   = ['climb', 'craft', 'handleAnimal', 'intimidate', 
-    'jump', 'ride', 'swim'];
-    classSkillsTable['monk']      = ['balance', 'climb', 'concentration', 'craft', 
-    'diplomacy', 'escapeArtist', 'hide', 'jump', 'knowledgeArcana', 'knowledgeReligion', 
-    'listen', 'moveSilently', 'perform', 'profession', 'senseMotive', 'spot', 'swim', 'tumble'];
-    classSkillsTable['paladin']   = ['concentration', 'craft', 'diplomacy', 'handleAnimal', 
-    'heal', 'knowledgeNobilityRoyalty', 'knowledgeReligion', 'profession', 'ride', 'senseMotive'];
-    classSkillsTable['ranger']    = ['climb', 'concentration', 'craft', 'handleAnimal', 'heal', 
-    'hide', 'jump', 'knowledgeDungeoneering', 'knowledgeGeography', 'knowledgeNature', 'listen', 
-    'moveSilently', 'profession', 'ride', 'search', 'spot', 'survival', 'swim', 'useRope'];
-    classSkillsTable['rogue']     = ['appraise', 'balance', 'bluff', 'climb', 'craft', 'decipherScript',
-    'diplomacy', 'disableDevice', 'disguise', 'escapeArtist', 'forgery', 'gatherInformation', 'hide',
-    'intimidate', 'jump', 'knowledgeLocal', 'listen', 'moveSilently', 'openLock', 'perform','profession',
-    'search', 'senseMotive', 'sleightOfHand', 'spot', 'swim', 'tumble', 'useMagicDevice', 'useRope'];
-    classSkillsTable['sorcerer']  = ['bluff', 'concentration', 'craft', 'knowledgeArcana', 'profession',
-    'spellcraft'];
-    classSkillsTable['wizard']    = ['concentration', 'craft', 'decipherScript', ...allKnowledges,
-    'profession', 'spellcraft'];
+    classSkillsTable['barbarian'] = {defaultSkills: ['climb', 'craft', 'handleAnimal', 'intimidate', 'jump', 
+        'listen', 'ride', 'survival', 'swim'], skillPointsPerLevel: 4};
+    classSkillsTable['bard']      = {defaultSkills: ['appraise', 'balance', 'bluff', 'climb', 'concentration',
+        'craft','decipherScript', 'diplomacy', 'disguise', 'escapeArtist', 'gatherInformation', 
+        'hide', 'jump', ...allKnowledges, 'listen', 'moveSilently', 'perform', 'profession', 
+        'senseMotive','sleightOfHand', 'speakLanguage', 'spellcraft', 'swim', 'tumble', 
+        'useMagicDevice'], skillPointsPerLevel: 6};
+    classSkillsTable['cleric']    = {defaultSkills: ['concentration', 'craft', 'diplomacy', 'heal', 
+        'knowledgeArcana', 'knowledgeHistory', 'knowledgeReligion', 'knowledgeThePlanes', 
+        'profession', 'spellcraft'], skillPointsPerLevel: 2};
+    classSkillsTable['druid']     = {defaultSkills: ['concentration', 'craft', 'diplomacy', 'handleAnimal', 
+        'heal', 'knowledgeNature', 'listen', 'profession', 'ride', 'spellcraft', 'spot', 
+        'survival', 'swim'], skillPointsPerLevel: 4};
+    classSkillsTable['fighter']   = {defaultSkills: ['climb', 'craft', 'handleAnimal', 'intimidate', 
+        'jump', 'ride', 'swim'], skillPointsPerLevel: 2};
+    classSkillsTable['monk']      = {defaultSkills: ['balance', 'climb', 'concentration', 'craft', 
+        'diplomacy', 'escapeArtist', 'hide', 'jump', 'knowledgeArcana', 'knowledgeReligion', 
+        'listen', 'moveSilently', 'perform', 'profession', 'senseMotive', 'spot', 'swim', 'tumble'], 
+        skillPointsPerLevel: 4};
+    classSkillsTable['paladin']   = {defaultSkills: ['concentration', 'craft', 'diplomacy', 'handleAnimal', 
+        'heal', 'knowledgeNobilityRoyalty', 'knowledgeReligion', 'profession', 'ride', 'senseMotive'], 
+        skillPointsPerLevel: 2};
+    classSkillsTable['ranger']    = {defaultSkills: ['climb', 'concentration', 'craft', 'handleAnimal', 'heal', 
+        'hide', 'jump', 'knowledgeDungeoneering', 'knowledgeGeography', 'knowledgeNature', 'listen', 
+        'moveSilently', 'profession', 'ride', 'search', 'spot', 'survival', 'swim', 'useRope'], 
+        skillPointsPerLevel: 6};
+    classSkillsTable['rogue']     = {defaultSkills: ['appraise', 'balance', 'bluff', 'climb', 'craft', 'decipherScript',
+        'diplomacy', 'disableDevice', 'disguise', 'escapeArtist', 'forgery', 'gatherInformation', 'hide',
+        'intimidate', 'jump', 'knowledgeLocal', 'listen', 'moveSilently', 'openLock', 'perform','profession',
+        'search', 'senseMotive', 'sleightOfHand', 'spot', 'swim', 'tumble', 'useMagicDevice', 'useRope'], 
+        skillPointsPerLevel: 8};
+    classSkillsTable['sorcerer']  = {defaultSkills: ['bluff', 'concentration', 'craft', 'knowledgeArcana', 'profession',
+        'spellcraft'], skillPointsPerLevel: 2};
+    classSkillsTable['wizard']    = {defaultSkills: ['concentration', 'craft', 'decipherScript', ...allKnowledges,
+        'profession', 'spellcraft'], skillPointsPerLevel: 2};
 }

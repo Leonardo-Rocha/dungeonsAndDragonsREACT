@@ -5,9 +5,6 @@
  * @class CharacterDetails
  */
 module.exports = class CharacterDetails {
-    size = 0;
-    baseLandSpeed = 0;
-    racial = [];
     constructor() {
     }
 }

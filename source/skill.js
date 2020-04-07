@@ -24,15 +24,28 @@ module.exports = class Skill {
     }
 
     /**
-     * Increment the skill rank by given quantity and compute the new total. By default increment by one.
+     * Increments(or decrements) the skill rank if there's available points(or it's possible).
      *
      * @param {number} rankIncrementQuantity
+     * @param {number} availableSkillPoints
+     * @param {number} characterLevel
+     * @return {number} spentPoints
      * @memberof Skill
      */
-    incrementRank = function (rankIncrementQuantity) {
-        this.rank += rankIncrementQuantity;
-        this.computeTotal();
-    };
+    incrementRank = function (rankIncrementQuantity, availableSkillPoints, characterLevel) {
+        let spentPoints = 0;
+        const maxRank = characterLevel + 3;
+        let newValue = this.rank + rankIncrementQuantity;
+
+        if(availableSkillPoints >= rankIncrementQuantity && newValue >= 0 && newValue <= maxRank) {
+            this.rank += rankIncrementQuantity;
+            this.computeTotal();
+            spentPoints = rankIncrementQuantity;
+        }
+
+        return spentPoints;
+    }
+
     /**
      * Compute the total adding the rank properly.
      * By the 3.5 rules, if it's not a class skill 2 ranks are required to increment the total by one.
@@ -44,7 +57,8 @@ module.exports = class Skill {
             return this.rank;
         else
             return Math.trunc(this.rank / 2);
-    };
+    }
+
     /**
      * @returns accumulated modifiers values.
      * @memberof Skill
@@ -55,7 +69,8 @@ module.exports = class Skill {
             return values.reduce((acc, cur) => acc + cur);
         else
             return 0;
-    };
+    }
+
     /**
      * Compute the total by adding the accumulated modifiers values to the rank total.
      *
@@ -63,7 +78,8 @@ module.exports = class Skill {
      */
     computeTotal = function () {
         this.total = this.computeModifiersTotal() + this.computeRankTotal();
-    };
+    }
+
     /**
      * Sets the skills modifiers and compute the new total.
      * Increments the value if the key already exists.
@@ -79,7 +95,8 @@ module.exports = class Skill {
                 this.modifiers[k] = modifiers[k];
         });
         this.computeTotal();
-    };
+    }
+
     /**
      * Sets the skill rank and compute the new total.
      *
@@ -89,5 +106,5 @@ module.exports = class Skill {
     setRank = function (rank) {
         this.rank = rank;
         this.computeTotal();
-    };
+    }
 }
